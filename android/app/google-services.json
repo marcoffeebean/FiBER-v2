@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "1018931558366",
+    "firebase_url": "https://fiber-app-2ada2-default-rtdb.firebaseio.com",
+    "project_id": "fiber-app-2ada2",
+    "storage_bucket": "fiber-app-2ada2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018931558366:android:16b6b0cdd1c44c9ecf8f4f",
+        "android_client_info": {
+          "package_name": "com.bsit.fiber"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2YNtXcUNpeVnDSs1_D0EDsl1IL62eEDI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018931558366:android:6274afd42b2c184fcf8f4f",
+        "android_client_info": {
+          "package_name": "com.bsit3b.fiber"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2YNtXcUNpeVnDSs1_D0EDsl1IL62eEDI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018931558366:android:6b80374c4b84458fcf8f4f",
+        "android_client_info": {
+          "package_name": "com.example.fiber_capstone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2YNtXcUNpeVnDSs1_D0EDsl1IL62eEDI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
