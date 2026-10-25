@@ -482,6 +482,9 @@ class _WordHuntGameState extends State<WordHuntGame> {
     if (_selectedPositions.isEmpty) return true;
 
     final last = _selectedPositions.last;
+    if (last == candidate) return false;
+    if (_selectedPositions.contains(candidate)) return false;
+
     final deltaRow = candidate.row - last.row;
     final deltaCol = candidate.col - last.col;
 
@@ -489,78 +492,29 @@ class _WordHuntGameState extends State<WordHuntGame> {
       return false;
     }
 
-    final anchor = _selectedPositions.first;
-    final anchorDeltaRow = candidate.row - anchor.row;
-    final anchorDeltaCol = candidate.col - anchor.col;
-
-    if (deltaRow != 0 && deltaCol != 0 && deltaRow.abs() != deltaCol.abs()) {
-      return false;
+    if (_selectedPositions.length == 1) {
+      final first = _selectedPositions.first;
+      final rowDelta = candidate.row - first.row;
+      final colDelta = candidate.col - first.col;
+      return rowDelta == 0 || colDelta == 0 || rowDelta.abs() == colDelta.abs();
     }
 
-    final isStraightLine =
-        anchorDeltaRow == 0 ||
-            anchorDeltaCol == 0 ||
-            anchorDeltaRow.abs() == anchorDeltaCol.abs();
+    final previous = _selectedPositions[_selectedPositions.length - 2];
+    final previousDeltaRow = last.row - previous.row;
+    final previousDeltaCol = last.col - previous.col;
+    final candidateDeltaRow = candidate.row - last.row;
+    final candidateDeltaCol = candidate.col - last.col;
 
-    if (!isStraightLine) {
-      return false;
-    }
+    final previousDirection = _directionVector(previousDeltaRow, previousDeltaCol);
+    final candidateDirection = _directionVector(candidateDeltaRow, candidateDeltaCol);
 
-    if (_selectedPositions.length > 1) {
-      final previous = _selectedPositions[_selectedPositions.length - 2];
-      final previousDeltaRow = last.row - previous.row;
-      final previousDeltaCol = last.col - previous.col;
-
-      final previousSignRow = _directionSign(previousDeltaRow);
-      final previousSignCol = _directionSign(previousDeltaCol);
-      final candidateSignRow = _directionSign(deltaRow);
-      final candidateSignCol = _directionSign(deltaCol);
-
-      if (previousSignRow != candidateSignRow ||
-          previousSignCol != candidateSignCol) {
-        return false;
-      }
-    }
-
-    return true;
+    return previousDirection == candidateDirection;
   }
 
-  void _beginSelection(_CellPosition cell) {
-    if (!_isPositionInsideGrid(cell)) return;
-    final cellLetter = _grid[cell.row][cell.col].letter;
-    if (cellLetter == null || cellLetter.isEmpty) return;
-
-    _selectedPositions
-      ..clear()
-      ..add(cell);
-    _currentWord = cellLetter.toUpperCase();
-    setState(() {});
-  }
-
-  void _updateSelection(_CellPosition cell) {
-    if (!_isPositionInsideGrid(cell)) return;
-    if (_selectedPositions.isEmpty) return;
-
-    final last = _selectedPositions.last;
-    if (last == cell) return;
-    if (_selectedPositions.contains(cell)) return;
-
-    final cellLetter = _grid[cell.row][cell.col].letter;
-    if (cellLetter == null || cellLetter.isEmpty) return;
-    if (!_canExtendSelection(cell)) return;
-
-    _selectedPositions.add(cell);
-    _currentWord = _selectedPositions
-        .map((position) => _grid[position.row][position.col].letter ?? '')
-        .join()
-        .toUpperCase();
-
-    setState(() {});
-  }
-
-  void _clearSelection() {
-    _selectedPositions.clear();
-    _currentWord = '';
+  _CellPosition _directionVector(int deltaRow, int deltaCol) {
+    final row = deltaRow == 0 ? 0 : (deltaRow > 0 ? 1 : -1);
+    final col = deltaCol == 0 ? 0 : (deltaCol > 0 ? 1 : -1);
+    return _CellPosition(row, col);
   }
 
   void _handleSelectionEnd() {
@@ -568,7 +522,6 @@ class _WordHuntGameState extends State<WordHuntGame> {
 
     final selectedWord = _currentWord.trim().toUpperCase();
     final reversedWord = selectedWord.split('').reversed.join();
-
     final candidates = <String>{selectedWord, reversedWord};
 
     for (final candidate in candidates) {
@@ -634,13 +587,6 @@ class _WordHuntGameState extends State<WordHuntGame> {
         final letter = _grid[row][col].letter;
         if (letter != null && letter.trim().isNotEmpty) {
           columnLetters.add(letter);
-        }
-      }
-
-      for (int row = size - 1; row >= 0; row--) {
-        final currentLetter = _grid[row][col].letter;
-        if (currentLetter != null && currentLetter.trim().isNotEmpty) {
-          _grid[row][col].letter = null;
         }
       }
 
@@ -744,22 +690,52 @@ class _WordHuntGameState extends State<WordHuntGame> {
     return _CellPosition(row, col);
   }
 
+  void _clearSelection() {
+    _selectedPositions.clear();
+    _currentWord = '';
+  }
+
+  void _beginSelection(_CellPosition cell) {
+    if (!_isPositionInsideGrid(cell)) return;
+    final cellLetter = _grid[cell.row][cell.col].letter;
+    if (cellLetter == null || cellLetter.trim().isEmpty) return;
+
+    _selectedPositions
+      ..clear()
+      ..add(cell);
+    _currentWord = cellLetter.toUpperCase();
+    setState(() {});
+  }
+
+  void _updateSelection(_CellPosition cell) {
+    if (!_isPositionInsideGrid(cell)) return;
+    if (_selectedPositions.isEmpty) return;
+    final last = _selectedPositions.last;
+    if (last == cell || _selectedPositions.contains(cell)) return;
+
+    final cellLetter = _grid[cell.row][cell.col].letter;
+    if (cellLetter == null || cellLetter.trim().isEmpty) return;
+    if (!_canExtendSelection(cell)) return;
+
+    _selectedPositions.add(cell);
+    _currentWord = _selectedPositions
+        .map((position) => _grid[position.row][position.col].letter ?? '')
+        .join()
+        .toUpperCase();
+
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD6F0F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFD6F0F5),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor ??
+            Theme.of(context).colorScheme.surface,
         elevation: 0,
-        leading: const BackButton(color: Colors.black),
-        title: const Text(
-          'Word Hunt',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
+        leading: const BackButton(),
+        title: const Text('Word Hunt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
         centerTitle: true,
       ),
       body: _invalidModule
@@ -769,210 +745,226 @@ class _WordHuntGameState extends State<WordHuntGame> {
                 child: Text(
                   'Not enough suitable words for this level.\nPlease upload a module with more content.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
             )
           : DataService.modules.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No modules uploaded yet.\nAsk your teacher to upload one.',
                     textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 8),
-                      Text(
-                        'Level $_currentLevel',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final gridSize = _grid.length;
+                    final safeWidth = constraints.maxWidth - 32;
+                    final cellSize = (safeWidth / gridSize).clamp(26.0, 52.0);
+                    final boardSize = cellSize * gridSize;
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _infoCard('Score', '$_score'),
-                          const SizedBox(width: 8),
-                          _infoCard('Time', _formattedTime),
-                          const SizedBox(width: 8),
-                          _infoCard('Words', '${_foundWords.length}/${_targetWords.length}'),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Level $_currentLevel',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final gridSize = _grid.length;
-                            final cellSize = (constraints.maxWidth / gridSize).clamp(16.0, 40.0);
-                            final boardSize = cellSize * gridSize;
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _infoCard('Score', '$_score', context),
+                              const SizedBox(width: 8),
+                              _infoCard('Time', _formattedTime, context),
+                              const SizedBox(width: 8),
+                              _infoCard('Words', '${_foundWords.length}/${_targetWords.length}', context),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context).shadowColor.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            child: Center(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onPanStart: (details) {
+                                  final cell = _cellFromLocalPosition(
+                                    details.localPosition,
+                                    cellSize,
+                                  );
+                                  if (cell != null) {
+                                    _beginSelection(cell);
+                                  }
+                                },
+                                onPanUpdate: (details) {
+                                  final cell = _cellFromLocalPosition(
+                                    details.localPosition,
+                                    cellSize,
+                                  );
+                                  if (cell != null) {
+                                    _updateSelection(cell);
+                                  }
+                                },
+                                onPanEnd: (_) => _handleSelectionEnd(),
+                                onPanCancel: () => _handleSelectionEnd(),
+                                child: SizedBox(
+                                  width: boardSize,
+                                  height: boardSize,
+                                  child: GridView.builder(
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: gridSize,
+                                      crossAxisSpacing: 3,
+                                      mainAxisSpacing: 3,
+                                      childAspectRatio: 1,
+                                    ),
+                                    itemCount: gridSize * gridSize,
+                                    itemBuilder: (context, index) {
+                                      final row = index ~/ gridSize;
+                                      final col = index % gridSize;
+                                      final cell = _grid[row][col];
+                                      final key = _CellPosition(row, col);
+                                      final isSelected = _selectedPositions.contains(key);
 
-                            return GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onPanStart: (details) {
-                                final cell = _cellFromLocalPosition(
-                                  details.localPosition,
-                                  cellSize,
-                                );
-                                if (cell != null) {
-                                  _beginSelection(cell);
-                                }
-                              },
-                              onPanUpdate: (details) {
-                                final cell = _cellFromLocalPosition(
-                                  details.localPosition,
-                                  cellSize,
-                                );
-                                if (cell != null) {
-                                  _updateSelection(cell);
-                                }
-                              },
-                              onPanEnd: (_) => _handleSelectionEnd(),
-                              onPanCancel: () => _handleSelectionEnd(),
-                              child: SizedBox(
-                                width: boardSize,
-                                height: boardSize,
-                                child: GridView.builder(
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: gridSize,
-                                    crossAxisSpacing: 3,
-                                    mainAxisSpacing: 3,
-                                    childAspectRatio: 1,
+                                      return AnimatedContainer(
+                                        duration: const Duration(milliseconds: 120),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? Theme.of(context).colorScheme.primary.withOpacity(0.18)
+                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
+                                            width: isSelected ? 1.5 : 1,
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          cell.letter ?? '',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                  itemCount: _grid.length * _grid.length,
-                                  itemBuilder: (context, index) {
-                                    final row = index ~/ gridSize;
-                                    final col = index % gridSize;
-                                    final cell = _grid[row][col];
-                                    final key = _CellPosition(row, col);
-                                    final isSelected = _selectedPositions.contains(key);
-
-                                    return AnimatedContainer(
-                                      duration: const Duration(milliseconds: 120),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? const Color(0xFF00BCD4).withValues(alpha: 0.25)
-                                            : Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: isSelected ? Colors.cyan : Colors.grey.shade200,
-                                          width: isSelected ? 1.5 : 1,
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        cell.letter ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (_currentWord.isNotEmpty)
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  _currentWord,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 3,
+                                    color: Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _clearSelection();
+                                  });
+                                },
+                                child: const Text('Clear'),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton(
+                                onPressed: _handleSelectionEnd,
+                                child: const Text('Check Word'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Words to find',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ..._targetWords.map((word) {
+                            final found = _foundWords.contains(word);
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: found
+                                    ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.35)
+                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                word,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: found ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
+                                  decoration: found ? TextDecoration.lineThrough : null,
                                 ),
                               ),
                             );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_currentWord.isNotEmpty)
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              _currentWord,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          OutlinedButton(
-                            onPressed: () {
-                              setState(() {
-                                _clearSelection();
-                              });
-                            },
-                            child: const Text('Clear'),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton(
-                            onPressed: _handleSelectionEnd,
-                            child: const Text('Check Word'),
-                          ),
+                          }),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Words to find',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      ..._targetWords.map((word) {
-                        final found = _foundWords.contains(word);
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: found ? Colors.green.shade100 : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            word,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: found ? Colors.green.shade800 : Colors.black87,
-                              decoration: found ? TextDecoration.lineThrough : null,
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                    );
+                  },
                 ),
     );
   }
 
-  Widget _infoCard(String label, String value) {
+  Widget _infoCard(String label, String value, BuildContext context) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Theme.of(context).shadowColor.withOpacity(0.05),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -983,15 +975,18 @@ class _WordHuntGameState extends State<WordHuntGame> {
           children: [
             Text(
               label,
-              style: const TextStyle(color: Colors.black54, fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
-                color: Color(0xFF00BCD4),
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],

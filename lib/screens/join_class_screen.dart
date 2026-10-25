@@ -91,15 +91,18 @@ class _JoinClassScreenState extends State<JoinClassScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFE6FAFF),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
-        leading: const BackButton(color: Colors.black),
-        title: const Text('My Classes',
+        leading: BackButton(color: theme.colorScheme.onSurface),
+        title: Text('My Classes',
             style: TextStyle(
-                color: Colors.black, fontWeight: FontWeight.bold)),
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Padding(
@@ -120,17 +123,19 @@ class _JoinClassScreenState extends State<JoinClassScreen> {
               onPressed: _showJoinDialog,
             ),
             const SizedBox(height: 24),
-            const Text('Joined Classes',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('Joined Classes',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: theme.colorScheme.onSurface)),
             const SizedBox(height: 8),
             Expanded(
               child: _joinedClasses.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'You have not joined any classes yet.\nTap "Join a Class" to get started.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                       ),
                     )
                   : ListView.builder(
@@ -152,9 +157,12 @@ class _JoinClassScreenState extends State<JoinClassScreen> {
                                   color: Colors.white),
                             ),
                             title: Text(classRoom.name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
-                            subtitle: Text('Code: $code'),
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface)),
+                            subtitle: Text('Code: $code',
+                                style: TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant)),
                             trailing: IconButton(
                               icon: const Icon(Icons.copy, size: 18),
                               tooltip: 'Copy code',

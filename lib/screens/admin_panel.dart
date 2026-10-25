@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/data_service.dart';
 import 'account_settings.dart';
-import 'profile_edit.dart';
+import 'system_settings.dart';
+import 'about_us.dart';
 
 class AdminPanel extends StatefulWidget {
   const AdminPanel({super.key});
@@ -15,6 +16,7 @@ class _AdminPanelState extends State<AdminPanel> {
   int _selectedTab = 0;
   List<Map<String, dynamic>> _users = [];
   bool _isLoadingUsers = false;
+  int _userListRefreshKey = 0;
 
   final _editFormKey = GlobalKey<FormState>();
   late TextEditingController _emailCtrl;
@@ -30,6 +32,15 @@ class _AdminPanelState extends State<AdminPanel> {
     _usernameCtrl = TextEditingController();
     _passwordCtrl = TextEditingController();
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _nameCtrl.dispose();
+    _usernameCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -52,7 +63,10 @@ class _AdminPanelState extends State<AdminPanel> {
         title: const Text('Delete User'),
         content: Text('Delete ${user['email'] ?? 'this user'} from Firebase?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -63,165 +77,280 @@ class _AdminPanelState extends State<AdminPanel> {
     );
 
     if (confirmed != true) return;
-
     await AuthService.deleteUser(id.toString());
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('User deleted.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('User deleted.')));
+    setState(() => _userListRefreshKey++);
     await _loadUsers();
+  }
+
+  Future<void> _showCreateTeacherDialog() async {
+    final nameCtrl = TextEditingController();
+    final usernameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Create Teacher Account',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Full Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Name is required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: usernameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (v) => (v == null || v.isEmpty)
+                        ? 'Username is required'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Email is required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: passwordCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      hintText: 'At least 6 characters',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Password is required';
+                      if (v.length < 6) return 'At least 6 characters';
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.lightBlueAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isLoading = true);
+                      final success = await AuthService.createTeacherAccount(
+                        email: emailCtrl.text.trim(),
+                        password: passwordCtrl.text,
+                        name: nameCtrl.text.trim(),
+                        username: usernameCtrl.text.trim(),
+                      );
+                      setDialogState(() => isLoading = false);
+                      Navigator.pop(context);
+                      if (success) {
+                        setState(() => _userListRefreshKey++);
+                        await _loadUsers();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Teacher account created successfully!',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Failed. Email may already be in use.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _showUserEditDialog(Map<String, dynamic> user) async {
     final userId = user['id']?.toString() ?? '';
-    final initialRole = (user['role'] ?? 'student').toString();
+    final initialRole = (user['role'] ?? 'student').toString().toLowerCase();
 
     _emailCtrl.text = (user['email'] ?? '').toString();
     _nameCtrl.text = (user['name'] ?? '').toString();
     _usernameCtrl.text = (user['username'] ?? '').toString();
     _passwordCtrl.clear();
 
-    String selectedRole = initialRole;
+    String selectedRole = ['student', 'teacher', 'admin'].contains(initialRole)
+        ? initialRole
+        : 'student';
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit User'),
-        content: Form(
-          key: _editFormKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _emailCtrl,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _usernameCtrl,
-                  decoration: const InputDecoration(labelText: 'Username'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordCtrl,
-                  decoration: const InputDecoration(labelText: 'New Password (optional)'),
-                  obscureText: true,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: ['student', 'teacher', 'admin'].contains(selectedRole.toLowerCase())
-                      ? selectedRole.toLowerCase()
-                      : 'student',
-                  decoration: const InputDecoration(labelText: 'Role'),
-                  items: const [
-                    DropdownMenuItem(value: 'student', child: Text('Student')),
-                    DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) selectedRole = value;
-                  },
-                ),
-              ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit User'),
+          content: Form(
+            key: _editFormKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _emailCtrl,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _usernameCtrl,
+                    decoration: const InputDecoration(labelText: 'Username'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password (optional)',
+                    ),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(labelText: 'Role'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'student',
+                        child: Text('Student'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'teacher',
+                        child: Text('Teacher'),
+                      ),
+                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedRole = value);
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
 
     if (result != true) return;
 
-    final email = _emailCtrl.text.trim();
-    final name = _nameCtrl.text.trim();
-    final username = _usernameCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
-
     final success = await AuthService.editUser(
       id: userId,
-      newEmail: email.isNotEmpty ? email : null,
-      newName: name.isNotEmpty ? name : null,
-      newUsername: username.isNotEmpty ? username : null,
+      newEmail: _emailCtrl.text.trim().isNotEmpty
+          ? _emailCtrl.text.trim()
+          : null,
+      newName: _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : null,
+      newUsername: _usernameCtrl.text.trim().isNotEmpty
+          ? _usernameCtrl.text.trim()
+          : null,
       newRole: selectedRole,
-      newPassword: password.isNotEmpty && userId == AuthService.currentUser?.id ? password : null,
+      newPassword:
+          _passwordCtrl.text.trim().isNotEmpty &&
+              userId == AuthService.currentUser?.id
+          ? _passwordCtrl.text.trim()
+          : null,
     );
 
     if (!mounted) return;
-
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User updated.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('User updated.')));
+      setState(() => _userListRefreshKey++);
       await _loadUsers();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update user.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to update user.')));
     }
-  }
-
-  void _showThemePicker(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) {
-        final currentTheme = DataService.themeMode;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Theme Settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<ThemeMode>(
-                title: const Text('System'),
-                value: ThemeMode.system,
-                groupValue: currentTheme,
-                onChanged: (value) {
-                  if (value != null) {
-                    DataService.setThemeMode(value);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              RadioListTile<ThemeMode>(
-                title: const Text('Light'),
-                value: ThemeMode.light,
-                groupValue: currentTheme,
-                onChanged: (value) {
-                  if (value != null) {
-                    DataService.setThemeMode(value);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              RadioListTile<ThemeMode>(
-                title: const Text('Dark'),
-                value: ThemeMode.dark,
-                groupValue: currentTheme,
-                onChanged: (value) {
-                  if (value != null) {
-                    DataService.setThemeMode(value);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -231,7 +360,8 @@ class _AdminPanelState extends State<AdminPanel> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+        backgroundColor:
+            theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
         title: Text(
           'Admin Panel',
@@ -248,27 +378,14 @@ class _AdminPanelState extends State<AdminPanel> {
               showDialog(
                 context: context,
                 builder: (_) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  title: const Text(
-                    'Logout Confirmation',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  content: const Text('Are you sure you want to log out?'),
+                  title: const Text('Logout'),
+                  content: const Text('Are you sure you want to logout?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
+                    TextButton(
                       onPressed: () async {
                         Navigator.pop(context);
                         await AuthService.logout();
@@ -290,15 +407,16 @@ class _AdminPanelState extends State<AdminPanel> {
           preferredSize: const Size.fromHeight(48),
           child: Row(
             children: [
-              _tabButton('System Logs', 0),
-              _tabButton('App Content', 1),
-              _tabButton('User Accounts', 2),
+              _tabButton('System Logs', 0, theme),
+              _tabButton('App Content', 1, theme),
+              _tabButton('User Accounts', 2, theme),
             ],
           ),
         ),
       ),
       drawer: Drawer(
-        backgroundColor: theme.drawerTheme.backgroundColor ?? theme.colorScheme.surface,
+        backgroundColor:
+            theme.drawerTheme.backgroundColor ?? theme.colorScheme.surface,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -313,59 +431,54 @@ class _AdminPanelState extends State<AdminPanel> {
                   ),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 28,
                       backgroundColor: Colors.white,
-                      child: Icon(Icons.admin_panel_settings, color: Colors.lightBlueAccent, size: 30),
+                      child: Icon(
+                        Icons.admin_panel_settings,
+                        color: Colors.lightBlueAccent,
+                        size: 30,
+                      ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
-                      'FiBER Admin',
-                      style: TextStyle(
+                      AuthService.currentUser?.name?.isNotEmpty == true
+                          ? AuthService.currentUser!.name
+                          : 'FiBER Admin',
+                      style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
                     Text(
-                      'Administrator Portal',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      AuthService.currentUser?.email ?? 'Administrator Portal',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-              Text('Profile', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-              const SizedBox(height: 8),
-              _DrawerTile(
-                icon: Icons.person_outline,
-                title: 'Profile',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              Text('Settings', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
               _DrawerTile(
                 icon: Icons.settings_outlined,
-                title: 'Settings',
+                title: 'System Settings',
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const SystemSettingsScreen(),
+                    ),
                   );
                 },
               ),
+              const SizedBox(height: 8),
               _DrawerTile(
                 icon: Icons.manage_accounts_outlined,
                 title: 'Account Settings',
@@ -373,43 +486,22 @@ class _AdminPanelState extends State<AdminPanel> {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const AccountSettingsScreen(),
+                    ),
                   );
                 },
               ),
-              _DrawerTile(
-                icon: Icons.brightness_6_outlined,
-                title: 'Theme Settings',
-                onTap: () {
-                  Navigator.pop(context);
-                  _showThemePicker(context);
-                },
-              ),
-              const Divider(height: 28),
-              Text('Admin Tools', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 8),
               _DrawerTile(
-                icon: Icons.list_alt_outlined,
-                title: 'System Logs',
+                icon: Icons.info_outline,
+                title: 'About Us',
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() => _selectedTab = 0);
-                },
-              ),
-              _DrawerTile(
-                icon: Icons.storage_outlined,
-                title: 'App Content',
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => _selectedTab = 1);
-                },
-              ),
-              _DrawerTile(
-                icon: Icons.people_alt_outlined,
-                title: 'User Accounts',
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => _selectedTab = 2);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AboutUsScreen()),
+                  );
                 },
               ),
             ],
@@ -417,43 +509,23 @@ class _AdminPanelState extends State<AdminPanel> {
         ),
       ),
       body: SafeArea(
-        child: DefaultTextStyle(
-          style: TextStyle(color: theme.colorScheme.onSurface),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'System Logs',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _selectedTab == 0
-                      ? _buildSystemLogs()
-                      : _selectedTab == 1
-                          ? _buildAppContent()
-                          : _buildUserAccounts(),
-                ),
-              ],
-            ),
-          ),
-        ),
+        child: _selectedTab == 0
+            ? _buildSystemLogs(theme)
+            : _selectedTab == 1
+            ? _buildAppContent(theme)
+            : _buildUserAccounts(theme),
       ),
     );
   }
 
-  Widget _tabButton(String label, int index) {
+  Widget _tabButton(String label, int index, ThemeData theme) {
     final selected = _selectedTab == index;
-    final theme = Theme.of(context);
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
+        onTap: () => setState(() {
+          _selectedTab = index;
+          if (index == 2) _userListRefreshKey++;
+        }),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
@@ -469,7 +541,9 @@ class _AdminPanelState extends State<AdminPanel> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: selected ? Colors.lightBlueAccent : theme.colorScheme.onSurfaceVariant,
+              color: selected
+                  ? Colors.lightBlueAccent
+                  : theme.colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -478,10 +552,8 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
-  // ── System Logs ────────────────────────────────────────────────
-  Widget _buildSystemLogs() {
+  Widget _buildSystemLogs(ThemeData theme) {
     final logs = DataService.systemLogs;
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -492,7 +564,11 @@ class _AdminPanelState extends State<AdminPanel> {
             children: [
               Text(
                 'System Logs',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
               TextButton.icon(
                 icon: const Icon(Icons.refresh, size: 16),
@@ -507,7 +583,9 @@ class _AdminPanelState extends State<AdminPanel> {
                 ? Center(
                     child: Text(
                       'No logs yet.',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -538,10 +616,8 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
-  // ── App Content (Modules) ──────────────────────────────────────
-  Widget _buildAppContent() {
+  Widget _buildAppContent(ThemeData theme) {
     final modules = DataService.modules;
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -549,7 +625,11 @@ class _AdminPanelState extends State<AdminPanel> {
         children: [
           Text(
             'Uploaded Modules',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: theme.colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(
@@ -557,7 +637,9 @@ class _AdminPanelState extends State<AdminPanel> {
                 ? Center(
                     child: Text(
                       'No modules uploaded yet.',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -565,14 +647,26 @@ class _AdminPanelState extends State<AdminPanel> {
                     itemBuilder: (_, i) {
                       final module = modules[i];
                       return Card(
+                        color: theme.colorScheme.surface,
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          leading: const Icon(Icons.book),
-                          title: Text(module.title),
+                          leading: Icon(
+                            Icons.book,
+                            color: theme.colorScheme.primary,
+                          ),
+                          title: Text(
+                            module.title,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
                           subtitle: Text(
                             module.content.length > 60
                                 ? '${module.content.substring(0, 60)}...'
                                 : module.content,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       );
@@ -584,9 +678,7 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
-  Widget _buildUserAccounts() {
-    final theme = Theme.of(context);
-
+  Widget _buildUserAccounts(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -603,67 +695,108 @@ class _AdminPanelState extends State<AdminPanel> {
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-              IconButton(
-                onPressed: _loadUsers,
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refresh users',
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.person_add, size: 16),
+                    label: const Text('Add Teacher'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.lightBlueAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    onPressed: _showCreateTeacherDialog,
+                  ),
+                  IconButton(
+                    onPressed: _loadUsers,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh',
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Expanded(
             child: _isLoadingUsers
                 ? const Center(child: CircularProgressIndicator())
                 : _users.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No users found in Firebase.',
-                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _users.length,
-                        itemBuilder: (_, index) {
-                          final user = _users[index];
-                          final email = (user['email'] ?? '').toString();
-                          final name = (user['name'] ?? '').toString();
-                          final username = (user['username'] ?? '').toString();
-                          final role = (user['role'] ?? 'student').toString();
-
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.lightBlueAccent,
-                                child: Text(
-                                  (name.isNotEmpty ? name[0] : email.isNotEmpty ? email[0] : 'U').toUpperCase(),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                              title: Text(name.isNotEmpty ? name : username.isNotEmpty ? username : email),
-                              subtitle: Text(
-                                '$email\nRole: ${role.toUpperCase()}',
-                              ),
-                              isThreeLine: true,
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    tooltip: 'Edit user',
-                                    onPressed: () => _showUserEditDialog(user),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    tooltip: 'Delete user',
-                                    onPressed: () => _deleteUser(user),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                ? Center(
+                    child: Text(
+                      'No users found.',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                  )
+                : ListView.builder(
+                    key: ValueKey(_userListRefreshKey),
+                    itemCount: _users.length,
+                    itemBuilder: (_, index) {
+                      final user = _users[index];
+                      final email = (user['email'] ?? '').toString();
+                      final name = (user['name'] ?? '').toString();
+                      final username = (user['username'] ?? '').toString();
+                      final role = (user['role'] ?? 'student').toString();
+
+                      return Card(
+                        color: theme.colorScheme.surface,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.lightBlueAccent,
+                            child: Text(
+                              (name.isNotEmpty
+                                      ? name[0]
+                                      : email.isNotEmpty
+                                      ? email[0]
+                                      : 'U')
+                                  .toUpperCase(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(
+                            name.isNotEmpty
+                                ? name
+                                : username.isNotEmpty
+                                ? username
+                                : email,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '$email\nRole: ${role.toUpperCase()}',
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          isThreeLine: true,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.edit,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                onPressed: () => _showUserEditDialog(user),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _deleteUser(user),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -685,18 +818,20 @@ class _DrawerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        margin: const EdgeInsets.only(bottom: 10),
+        margin: const EdgeInsets.only(bottom: 4),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
-            BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 4),
+            BoxShadow(
+              color: theme.shadowColor.withOpacity(0.08),
+              blurRadius: 4,
+            ),
           ],
         ),
         child: Row(
@@ -708,12 +843,16 @@ class _DrawerTile extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
-                  fontSize: 16,
+                  fontSize: 15,
                   color: theme.colorScheme.onSurface,
                 ),
               ),
             ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
       ),

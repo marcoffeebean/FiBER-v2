@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 import 'dart:convert';
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
@@ -22,16 +23,37 @@ class DataService {
 
   static List<Module> get modules => List.unmodifiable(_modules);
   static List<ClassRoom> get classes => List.unmodifiable(_classes);
-  static List<String> get joinedClassCodes => List.unmodifiable(_joinedClassCodes);
+  static List<String> get joinedClassCodes =>
+      List.unmodifiable(_joinedClassCodes);
   static List<String> get systemLogs => List.unmodifiable(_systemLogs);
 
-  static final ValueNotifier<int> moduleUpdateNotifier = ValueNotifier(0);
-  static final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.system);
+  static ValueNotifier<int> moduleUpdateNotifier = ValueNotifier(0);
+  static ValueNotifier<ThemeMode>? _themeModeNotifier;
+  static ValueNotifier<String>? _fontFamilyNotifier;
+  static ValueNotifier<double>? _fontSizeNotifier;
+
+  static ValueNotifier<ThemeMode> get themeModeNotifier =>
+      _themeModeNotifier ??= ValueNotifier(ThemeMode.system);
+  static ValueNotifier<String> get fontFamilyNotifier =>
+      _fontFamilyNotifier ??= ValueNotifier('Roboto');
+  static ValueNotifier<double> get fontSizeNotifier =>
+      _fontSizeNotifier ??= ValueNotifier(14.0);
 
   static ThemeMode get themeMode => themeModeNotifier.value;
+  static String get selectedFontFamily => fontFamilyNotifier.value;
+  static double get fontScale => fontSizeNotifier.value / 14.0;
 
   static void setThemeMode(ThemeMode value) {
     themeModeNotifier.value = value;
+  }
+
+  static void setFontFamily(String value) {
+    if (value.trim().isEmpty) return;
+    fontFamilyNotifier.value = value;
+  }
+
+  static void setFontSize(double size) {
+    fontSizeNotifier.value = size;
   }
 
   // ── Study Timer ────────────────────────────────────────────────
@@ -87,7 +109,7 @@ class DataService {
     return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  // ── Get file bytes from path or bytes ──────────────────────────
+  // ── Get file bytes ─────────────────────────────────────────────
   static Future<Uint8List?> _getBytes({
     Uint8List? bytes,
     String? filePath,
@@ -104,7 +126,193 @@ class DataService {
     return null;
   }
 
-  // ── Extract text from file ─────────────────────────────────────
+  // ── Strip XML tags, return plain text ─────────────────────────
+  static String _stripXml(String xml) {
+    return xml
+        .replaceAll(RegExp(r'<[^>]+>'), ' ')
+        .replaceAll(RegExp(r'&amp;'), '&')
+        .replaceAll(RegExp(r'&lt;'), '<')
+        .replaceAll(RegExp(r'&gt;'), '>')
+        .replaceAll(RegExp(r'&quot;'), '"')
+        .replaceAll(RegExp(r'&apos;'), "'")
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  // ── PPTX extraction ────────────────────────────────────────────
+  // PPTX files are ZIP archives containing slide XML files.
+  // Each slide is in ppt/slides/slide1.xml, slide2.xml, etc.
+  static String _extractPptx(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final slideBuffer = StringBuffer();
+
+      // Collect slide files and sort by slide number
+      final slideFiles = archive.files
+          .where((f) =>
+              f.name.startsWith('ppt/slides/slide') &&
+              f.name.endsWith('.xml') &&
+              !f.name.contains('slideLayout') &&
+              !f.name.contains('slideMaster'))
+          .toList();
+
+      slideFiles.sort((a, b) {
+        // Extract slide number from filename e.g. slide1.xml → 1
+        final aNum = int.tryParse(
+                RegExp(r'slide(\d+)\.xml').firstMatch(a.name)?.group(1) ??
+                    '0') ??
+            0;
+        final bNum = int.tryParse(
+                RegExp(r'slide(\d+)\.xml').firstMatch(b.name)?.group(1) ??
+                    '0') ??
+            0;
+        return aNum.compareTo(bNum);
+      });
+
+      int slideNumber = 1;
+      for (final file in slideFiles) {
+        if (!file.isFile) continue;
+        try {
+          final xmlContent = utf8.decode(file.content as List<int>,
+              allowMalformed: true);
+
+          // Extract text runs preserving paragraph breaks
+          final paragraphs = <String>[];
+          final paraMatches =
+              RegExp(r'<a:p[>\s][^]*?</a:p>').allMatches(xmlContent);
+
+          for (final para in paraMatches) {
+            final paraXml = para.group(0) ?? '';
+            // Extract text elements within paragraph
+            final textParts = <String>[];
+            final textMatches =
+                RegExp(r'<a:t[>\s][^]*?</a:t>').allMatches(paraXml);
+            for (final t in textMatches) {
+              final raw = t.group(0) ?? '';
+              final text = _stripXml(raw).trim();
+              if (text.isNotEmpty) textParts.add(text);
+            }
+            final paraText = textParts.join(' ').trim();
+            if (paraText.isNotEmpty) paragraphs.add(paraText);
+          }
+
+          if (paragraphs.isNotEmpty) {
+            slideBuffer.writeln('--- Slide $slideNumber ---');
+            for (final p in paragraphs) {
+              slideBuffer.writeln(p);
+            }
+            slideBuffer.writeln();
+          }
+          slideNumber++;
+        } catch (e) {
+          debugPrint('Error reading slide ${file.name}: $e');
+        }
+      }
+
+      final result = slideBuffer.toString().trim();
+      debugPrint('PPTX extracted: ${result.length} chars, $slideNumber slides');
+      return result;
+    } catch (e) {
+      debugPrint('PPTX extraction error: $e');
+      return '';
+    }
+  }
+
+  // ── Improved DOCX extraction ───────────────────────────────────
+  // Uses docx_to_text as primary, falls back to manual XML parse
+  static String _extractDocx(Uint8List bytes) {
+    try {
+      // Primary: use docx_to_text
+      final text = docxToText(bytes);
+      if (text.trim().isNotEmpty) {
+        debugPrint('DOCX extracted via docx_to_text: ${text.length} chars');
+        return text;
+      }
+    } catch (e) {
+      debugPrint('docx_to_text failed: $e, trying manual extraction');
+    }
+
+    // Fallback: manual XML extraction from ZIP
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final docFile = archive.files.firstWhere(
+        (f) => f.name == 'word/document.xml',
+        orElse: () => archive.files.first,
+      );
+
+      final xmlContent =
+          utf8.decode(docFile.content as List<int>, allowMalformed: true);
+
+      // Extract paragraphs preserving structure
+      final paragraphs = <String>[];
+      final paraMatches =
+          RegExp(r'<w:p[ >][^]*?</w:p>').allMatches(xmlContent);
+
+      for (final para in paraMatches) {
+        final paraXml = para.group(0) ?? '';
+        final textParts = <String>[];
+        final textMatches =
+            RegExp(r'<w:t[^>]*>([^<]*)</w:t>').allMatches(paraXml);
+        for (final t in textMatches) {
+          final text = t.group(1)?.trim() ?? '';
+          if (text.isNotEmpty) textParts.add(text);
+        }
+        final paraText = textParts.join(' ').trim();
+        if (paraText.isNotEmpty) paragraphs.add(paraText);
+      }
+
+      final result = paragraphs.join('\n').trim();
+      debugPrint('DOCX fallback extracted: ${result.length} chars');
+      return result;
+    } catch (e) {
+      debugPrint('DOCX fallback extraction error: $e');
+      return '';
+    }
+  }
+
+  // ── Improved PDF extraction ────────────────────────────────────
+  // Extracts text page by page to preserve reading order
+  static String _extractPdf(Uint8List bytes) {
+    try {
+      final document = PdfDocument(inputBytes: bytes);
+      final extractor = PdfTextExtractor(document);
+      final pageBuffer = StringBuffer();
+
+      for (int i = 0; i < document.pages.count; i++) {
+        try {
+          final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
+          final trimmed = pageText.trim();
+          if (trimmed.isNotEmpty) {
+            pageBuffer.writeln('--- Page ${i + 1} ---');
+            pageBuffer.writeln(trimmed);
+            pageBuffer.writeln();
+          }
+        } catch (e) {
+          debugPrint('Error extracting PDF page $i: $e');
+        }
+      }
+
+      document.dispose();
+      final result = pageBuffer.toString().trim();
+      debugPrint('PDF extracted: ${result.length} chars, ${document.pages.count} pages');
+      return result;
+    } catch (e) {
+      debugPrint('PDF extraction error: $e');
+      // Fallback: extract all at once
+      try {
+        final document = PdfDocument(inputBytes: bytes);
+        final text = PdfTextExtractor(document).extractText();
+        document.dispose();
+        debugPrint('PDF fallback extracted: ${text.length} chars');
+        return text;
+      } catch (e2) {
+        debugPrint('PDF fallback also failed: $e2');
+        return '';
+      }
+    }
+  }
+
+  // ── Main extraction dispatcher ─────────────────────────────────
   static Future<String> _extractText({
     required String fileName,
     Uint8List? bytes,
@@ -120,25 +328,24 @@ class DataService {
       final fileLower = fileName.toLowerCase();
 
       if (fileLower.endsWith('.pdf')) {
-        final document = PdfDocument(inputBytes: fileBytes);
-        final text = PdfTextExtractor(document).extractText();
-        document.dispose();
-        debugPrint('PDF extracted: ${text.length} chars');
-        return text;
+        return _extractPdf(fileBytes);
+      }
+
+      if (fileLower.endsWith('.pptx') || fileLower.endsWith('.ppt')) {
+        return _extractPptx(fileBytes);
       }
 
       if (fileLower.endsWith('.docx')) {
-        final text = docxToText(fileBytes);
-        debugPrint('DOCX extracted: ${text.length} chars');
-        return text;
+        return _extractDocx(fileBytes);
       }
 
       if (fileLower.endsWith('.txt')) {
-        final text = utf8.decode(fileBytes);
+        final text = utf8.decode(fileBytes, allowMalformed: true);
         debugPrint('TXT extracted: ${text.length} chars');
         return text;
       }
 
+      debugPrint('Unsupported file format: $fileName');
       return '';
     } catch (e) {
       debugPrint('Text extraction error: $e');
@@ -148,8 +355,14 @@ class DataService {
 
   // ── Generate questions from module content ─────────────────────
   static List<Question> _generateQuestions(String content) {
-    final sentences = content
-        .split(RegExp(r'[.!?]'))
+    // Clean page/slide markers before processing
+    final cleanContent = content
+        .replaceAll(RegExp(r'--- (Page|Slide) \d+ ---'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    final sentences = cleanContent
+        .split(RegExp(r'[.!?\n]'))
         .map((s) => s.trim())
         .where((s) => s.split(' ').length > 5)
         .toList();
@@ -175,7 +388,7 @@ class DataService {
 
       final blankSentence = sentence.replaceFirst(keyword, '_____');
 
-      final allWords = content
+      final allWords = cleanContent
           .split(RegExp(r'[^a-zA-Z]+'))
           .where((w) =>
               w.length > 4 &&
@@ -203,8 +416,11 @@ class DataService {
 
   // ── Extract words for word hunt ────────────────────────────────
   static List<String> extractWordsForWordHunt(String content) {
-    final words = content
-        .toUpperCase()
+    final cleanContent = content
+        .replaceAll(RegExp(r'--- (Page|Slide) \d+ ---'), '')
+        .toUpperCase();
+
+    final words = cleanContent
         .split(RegExp(r'[^A-Z]+'))
         .where((w) => w.length >= 4 && w.length <= 10)
         .toSet()
@@ -237,8 +453,8 @@ class DataService {
     );
 
     debugPrint('Extracted content length: ${content.length}');
-    if (content.length > 100) {
-      debugPrint('Preview: ${content.substring(0, 100)}');
+    if (content.length > 200) {
+      debugPrint('Preview: ${content.substring(0, 200)}');
     }
 
     if (content.trim().isEmpty) {
@@ -255,8 +471,7 @@ class DataService {
       questions: questions,
     ));
 
-    _log(
-        'Module uploaded: $fileName (${questions.length} questions generated)');
+    _log('Module uploaded: $fileName (${questions.length} questions generated)');
     notifyModuleUpdated();
   }
 
@@ -290,8 +505,11 @@ class DataService {
     final normalizedId = id.trim().toUpperCase();
     if (normalizedId.isEmpty) return false;
 
-    final found = _classes.any((c) => c.id.toUpperCase() == normalizedId);
-    if (found && !_joinedClassCodes.any((code) => code.toUpperCase() == normalizedId)) {
+    final found =
+        _classes.any((c) => c.id.toUpperCase() == normalizedId);
+    if (found &&
+        !_joinedClassCodes
+            .any((code) => code.toUpperCase() == normalizedId)) {
       _joinedClassCodes.add(normalizedId);
     }
 
@@ -303,12 +521,14 @@ class DataService {
 
   static void leaveClass(String id) {
     final normalizedId = id.trim().toUpperCase();
-    _joinedClassCodes.removeWhere((code) => code.toUpperCase() == normalizedId);
+    _joinedClassCodes
+        .removeWhere((code) => code.toUpperCase() == normalizedId);
   }
 
   static bool hasJoinedClass(String id) {
     final normalizedId = id.trim().toUpperCase();
-    return _joinedClassCodes.any((code) => code.toUpperCase() == normalizedId);
+    return _joinedClassCodes
+        .any((code) => code.toUpperCase() == normalizedId);
   }
 
   static void notifyModuleUpdated() {

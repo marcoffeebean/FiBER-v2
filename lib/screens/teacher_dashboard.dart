@@ -6,7 +6,8 @@ import '../services/data_service.dart';
 import 'account_settings.dart';
 import 'class_management.dart';
 import 'module_viewer.dart';
-import 'profile_edit.dart';
+import 'system_settings.dart';
+import 'about_us.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -18,57 +19,6 @@ class TeacherDashboard extends StatefulWidget {
 class _TeacherDashboardState extends State<TeacherDashboard> {
   bool _isUploading = false;
   String? _lastUploadedFileName;
-
-  void _showThemePicker(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) {
-        final currentTheme = DataService.themeMode;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Theme Settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<ThemeMode>(
-                title: const Text('System'),
-                value: ThemeMode.system,
-                groupValue: currentTheme,
-                onChanged: (value) {
-                  if (value != null) {
-                    DataService.setThemeMode(value);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              RadioListTile<ThemeMode>(
-                title: const Text('Light'),
-                value: ThemeMode.light,
-                groupValue: currentTheme,
-                onChanged: (value) {
-                  if (value != null) {
-                    DataService.setThemeMode(value);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              RadioListTile<ThemeMode>(
-                title: const Text('Dark'),
-                value: ThemeMode.dark,
-                groupValue: currentTheme,
-                onChanged: (value) {
-                  if (value != null) {
-                    DataService.setThemeMode(value);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -85,10 +35,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
             onPressed: () async {
               await AuthService.logout();
               Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+                  context, '/login', (route) => false);
             },
             child: const Text('Logout'),
           ),
@@ -100,51 +47,41 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   Future<void> _pickAndUploadModule() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'docx', 'txt'],
+      allowedExtensions: ['pdf', 'docx', 'txt', 'pptx', 'ppt'],
     );
-
-    if (result == null || result.files.isEmpty) return; // user cancelled
+    if (result == null || result.files.isEmpty) return;
 
     final file = result.files.first;
     final fileName = file.name;
-    final fileBytes = file.bytes; // for web
-    final filePath = file.path; // for mobile/desktop
+    final fileBytes = file.bytes;
+    final filePath = file.path;
 
     setState(() => _isUploading = true);
 
     try {
-      // Extract title from file name (remove extension)
       final title = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
-
-      // Upload to Firebase / DataService
       await DataService.uploadModuleFile(
         title: title,
         fileName: fileName,
         bytes: fileBytes,
         filePath: filePath,
       );
-
       setState(() {
         _lastUploadedFileName = fileName;
         _isUploading = false;
       });
-
-      // Notify student screens to rebuild
       DataService.notifyModuleUpdated();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ "$title" uploaded successfully!'),
-          backgroundColor: Colors.green,
-        ),
+            content: Text('✅ "$title" uploaded successfully!'),
+            backgroundColor: Colors.green),
       );
     } catch (e) {
       setState(() => _isUploading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Upload failed: $e'),
-          backgroundColor: Colors.red,
-        ),
+            content: Text('❌ Upload failed: $e'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -157,18 +94,16 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         content: Text('Are you sure you want to delete "${module.title}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               DataService.deleteModule(DataService.modules.indexOf(module));
-
               Navigator.pop(context);
-
-              setState(() {}); // refresh UI
+              setState(() {});
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child:
+                const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -182,15 +117,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+        backgroundColor:
+            theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
-        title: Text(
-          'FiBER',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
+        title: Text('FiBER',
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -200,11 +133,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         ],
       ),
       drawer: Drawer(
-        backgroundColor: theme.drawerTheme.backgroundColor ?? theme.colorScheme.surface,
+        backgroundColor:
+            theme.drawerTheme.backgroundColor ?? theme.colorScheme.surface,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Header
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -215,98 +150,68 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                   ),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 28,
                       backgroundColor: Colors.white,
-                      child: Icon(Icons.person, color: Colors.lightBlueAccent, size: 30),
+                      child: Icon(Icons.person,
+                          color: Colors.lightBlueAccent, size: 30),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
-                      'FiBER Teacher',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      AuthService.currentUser?.name?.isNotEmpty == true
+                          ? AuthService.currentUser!.name
+                          : 'FiBER Teacher',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold),
                     ),
-                    SizedBox(height: 4),
                     Text(
-                      'Teacher Portal',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      AuthService.currentUser?.email ?? 'Teacher Portal',
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-              Text('Profile', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-              const SizedBox(height: 8),
-              _DrawerTile(
-                icon: Icons.person_outline,
-                title: 'Profile',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              Text('Settings', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
+
               _DrawerTile(
                 icon: Icons.settings_outlined,
-                title: 'Settings',
+                title: 'System Settings',
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
-                  );
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SystemSettingsScreen()));
                 },
               ),
+              const SizedBox(height: 8),
               _DrawerTile(
                 icon: Icons.manage_accounts_outlined,
                 title: 'Account Settings',
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
-                  );
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AccountSettingsScreen()));
                 },
               ),
-              _DrawerTile(
-                icon: Icons.brightness_6_outlined,
-                title: 'Theme Settings',
-                onTap: () {
-                  Navigator.pop(context);
-                  _showThemePicker(context);
-                },
-              ),
-              const Divider(height: 28),
-              Text('Teacher Tools', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 8),
               _DrawerTile(
-                icon: Icons.class_outlined,
-                title: 'Class Management',
+                icon: Icons.info_outline,
+                title: 'About Us',
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ClassManagement()),
-                  );
-                },
-              ),
-              _DrawerTile(
-                icon: Icons.upload_file_outlined,
-                title: 'Upload Module',
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickAndUploadModule();
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AboutUsScreen()));
                 },
               ),
             ],
@@ -314,146 +219,155 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         ),
       ),
       body: SafeArea(
-        child: DefaultTextStyle(
-          style: TextStyle(color: theme.colorScheme.onSurface),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Teacher Dashboard',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Manage Classes',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.class_),
-                  label: const Text('Go to Class Management'),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ClassManagement()),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                const Divider(),
-                Text(
-                  'Upload Module',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Upload a PDF, Word, or TXT file. Mock exams, quizzes, and '
-                  'mini games will automatically update based on the content.',
-                  style: TextStyle(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _isUploading
-                    ? Center(
-                        child: Column(
-                          children: [
-                            const CircularProgressIndicator(),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Uploading module...',
-                              style: TextStyle(color: theme.colorScheme.onSurface),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ElevatedButton.icon(
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Choose & Upload Module'),
-                        style: ElevatedButton.styleFrom(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Teacher Dashboard',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ) ??
+                      TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      )),
+              const SizedBox(height: 12),
+
+              // Class Management
+              Text('Manage Classes',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ) ??
+                      TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      )),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.class_),
+                label: const Text('Go to Class Management'),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ClassManagement())),
+              ),
+
+              const SizedBox(height: 28),
+              const Divider(),
+
+              // Upload Module
+              Text('Upload Module',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ) ??
+                      TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      )),
+              const SizedBox(height: 4),
+              Text(
+                'Upload a PDF, Word, or TXT file. Mock exams, quizzes, and mini games will automatically update.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ) ??
+                    TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              _isUploading
+                  ? Center(
+                      child: Column(children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 8),
+                      Text('Uploading module...',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurface)),
+                    ]))
+                  : ElevatedButton.icon(
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('Choose & Upload Module'),
+                      style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: _pickAndUploadModule,
-                      ),
-                if (_lastUploadedFileName != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 18),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Last uploaded: $_lastUploadedFileName',
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 28),
-                const Divider(),
-                Text(
-                  'Uploaded Modules',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...DataService.modules.map((m) {
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.book),
-                      title: Text(m.title),
-                      subtitle: Text(
-                        m.content.length > 60
-                            ? '${m.content.substring(0, 60)}...'
-                            : m.content,
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.visibility),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ModuleViewer(module: m),
-                                ),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _confirmDeleteModule(m),
-                          ),
-                        ],
-                      ),
+                          foregroundColor: Colors.white),
+                      onPressed: _pickAndUploadModule,
                     ),
-                  );
-                }),
+              if (_lastUploadedFileName != null) ...[
+                const SizedBox(height: 12),
+                Row(children: [
+                  const Icon(Icons.check_circle,
+                      color: Colors.green, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(
+                      child: Text('Last uploaded: $_lastUploadedFileName',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w500,
+                              ) ??
+                              const TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w500))),
+                ]),
               ],
-            ),
+
+              const SizedBox(height: 28),
+              const Divider(),
+
+              // Uploaded Modules
+              Text('Uploaded Modules',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ) ??
+                      TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      )),
+              const SizedBox(height: 8),
+              ...DataService.modules.map((m) {
+                return Card(
+                  color: theme.colorScheme.surface,
+                  child: ListTile(
+                    leading: Icon(Icons.book,
+                        color: theme.colorScheme.primary),
+                    title: Text(m.title,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                            ) ??
+                            TextStyle(color: theme.colorScheme.onSurface)),
+                    subtitle: Text(
+                      m.content.length > 60
+                          ? '${m.content.substring(0, 60)}...'
+                          : m.content,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ) ??
+                          TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.visibility,
+                              color: theme.colorScheme.primary),
+                          onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      ModuleViewer(module: m))),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete,
+                              color: Colors.red),
+                          onPressed: () => _confirmDeleteModule(m),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
           ),
         ),
       ),
@@ -466,27 +380,26 @@ class _DrawerTile extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
 
-  const _DrawerTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
+  const _DrawerTile(
+      {required this.icon, required this.title, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        margin: const EdgeInsets.only(bottom: 10),
+        padding:
+            const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        margin: const EdgeInsets.only(bottom: 4),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
-            BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 4),
+            BoxShadow(
+                color: theme.shadowColor.withOpacity(0.08),
+                blurRadius: 4)
           ],
         ),
         child: Row(
@@ -494,20 +407,18 @@ class _DrawerTile extends StatelessWidget {
             Icon(icon, color: theme.colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+                child: Text(title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
+                        ) ??
+                        TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
+                        ))),
+            Icon(Icons.arrow_forward_ios,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant),
           ],
         ),
       ),

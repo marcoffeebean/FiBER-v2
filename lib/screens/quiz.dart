@@ -41,23 +41,23 @@ class _MiniQuizState extends State<MiniQuiz> {
     });
   }
 
- void _loadQuestions() {
-  final modules = DataService.modules;
+  void _loadQuestions() {
+    final modules = DataService.modules;
 
-  if (modules.isEmpty) {
-    _questions = [];
-    return;
+    if (modules.isEmpty) {
+      _questions = [];
+      return;
+    }
+
+    final module = modules.last;
+
+    if (module.questions.isEmpty) {
+      _questions = [];
+      return;
+    }
+
+    _questions = List<Question>.from(module.questions);
   }
-
-  final module = modules.last;
-
-  if (module.questions.isEmpty) {
-    _questions = [];
-    return;
-  }
-
-  _questions = List<Question>.from(module.questions);
-}
 
   void _selectAnswer(int index) {
     if (_answered) return;
@@ -92,115 +92,135 @@ class _MiniQuizState extends State<MiniQuiz> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFE6FAFF),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE6FAFF),
+        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
-        leading: const BackButton(color: Colors.black),
-        title: const Text('Mini Quiz',
-            style:
-                TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        leading: BackButton(color: theme.colorScheme.onSurface),
+        title: Text(
+          'Mini Quiz',
+          style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
         child: _questions.isEmpty
-            ? const Center(
+            ? Center(
                 child: Text(
                   'No questions available.\nAsk your teacher to upload a module.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )
             : _finished
-                ? _buildResults()
-                : _buildQuestion(),
+            ? _buildResults(theme)
+            : Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildQuestion(theme),
+              ),
       ),
     );
   }
 
-  Widget _buildQuestion() {
+  Widget _buildQuestion(ThemeData theme) {
     final q = _questions[_currentIndex];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Question ${_currentIndex + 1} of ${_questions.length}',
-            style: const TextStyle(color: Colors.black54)),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: (_currentIndex + 1) / _questions.length,
-            minHeight: 8,
-            backgroundColor: Colors.white,
-            valueColor:
-                const AlwaysStoppedAnimation(Colors.lightBlueAccent),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Question ${_currentIndex + 1} of ${_questions.length}',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
           ),
-        ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12)),
-          child: Text(q.question,
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(height: 16),
-        ...q.choices.asMap().entries.map((entry) {
-          final i = entry.key;
-          final choice = entry.value;
-          Color bgColor = Colors.white;
-          if (_answered) {
-            if (i == q.correctIndex) bgColor = Colors.green.shade100;
-            if (i == _selectedAnswer && i != q.correctIndex)
-              bgColor = Colors.red.shade100;
-          }
-          return GestureDetector(
-            onTap: () => _selectAnswer(i),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(
-                  vertical: 14, horizontal: 16),
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _answered && i == q.correctIndex
-                      ? Colors.green
-                      : Colors.grey.shade300,
-                ),
-              ),
-              child: Text(choice,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: (_currentIndex + 1) / _questions.length,
+              minHeight: 8,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              valueColor: const AlwaysStoppedAnimation(Colors.lightBlueAccent),
             ),
-          );
-        }),
-        const Spacer(),
-        if (_answered)
-          ElevatedButton(
-            onPressed: _next,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.lightBlueAccent,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              _currentIndex + 1 >= _questions.length
-                  ? 'See Results'
-                  : 'Next Question',
-              style: const TextStyle(color: Colors.white),
+              q.question,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ),
-      ],
+          const SizedBox(height: 16),
+          ...q.choices.asMap().entries.map((entry) {
+            final i = entry.key;
+            final choice = entry.value;
+            Color bgColor = theme.colorScheme.surface;
+            if (_answered) {
+              if (i == q.correctIndex) bgColor = Colors.green.shade100;
+              if (i == _selectedAnswer && i != q.correctIndex) bgColor = Colors.red.shade100;
+            }
+            return GestureDetector(
+              onTap: () => _selectAnswer(i),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _answered && i == q.correctIndex
+                        ? Colors.green
+                        : theme.colorScheme.outline,
+                  ),
+                ),
+                child: Text(
+                  choice,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 16),
+          if (_answered)
+            ElevatedButton(
+              onPressed: _next,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.lightBlueAccent,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                _currentIndex + 1 >= _questions.length
+                    ? 'See Results'
+                    : 'Next Question',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildResults() {
+  Widget _buildResults(ThemeData theme) {
     setState(() {
       DataService.addQuizTaken();
     });
@@ -210,13 +230,19 @@ class _MiniQuizState extends State<MiniQuiz> {
         children: [
           const Icon(Icons.star, size: 80, color: Colors.amber),
           const SizedBox(height: 16),
-          const Text('Quiz Complete!',
-              style: TextStyle(
-                  fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(
+            'Quiz Complete!',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('Score: $_score / ${_questions.length}',
-              style:
-                  const TextStyle(fontSize: 20, color: Colors.black54)),
+          Text(
+            'Score: $_score / ${_questions.length}',
+            style: TextStyle(fontSize: 20, color: theme.colorScheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             icon: const Icon(Icons.refresh),
@@ -224,10 +250,10 @@ class _MiniQuizState extends State<MiniQuiz> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.lightBlueAccent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                  vertical: 14, horizontal: 24),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: _restart,
           ),
