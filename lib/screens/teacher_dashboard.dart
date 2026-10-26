@@ -218,157 +218,177 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Teacher Dashboard',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ) ??
-                      TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      )),
-              const SizedBox(height: 12),
-
-              // Class Management
-              Text('Manage Classes',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ) ??
-                      TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      )),
-              const SizedBox(height: 8),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.class_),
-                label: const Text('Go to Class Management'),
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const ClassManagement())),
+      body: Container(
+        decoration: BoxDecoration(
+          color: Colors.lightBlue.shade50,
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.7,
+                child: Image.asset(
+                  'lib/assets/images/Minimalist Blue Fish Pattern.png',
+                  fit: BoxFit.cover,
+                  color: Colors.lightBlue.shade200,
+                  colorBlendMode: BlendMode.modulate,
+                ),
               ),
-
-              const SizedBox(height: 28),
-              const Divider(),
-
-              // Upload Module
-              Text('Upload Module',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ) ??
-                      TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      )),
-              const SizedBox(height: 4),
-              Text(
-                'Upload a PDF, Word, or TXT file. Mock exams, quizzes, and mini games will automatically update.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ) ??
-                    TextStyle(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16),
-              _isUploading
-                  ? Center(
-                      child: Column(children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 8),
-                      Text('Uploading module...',
-                          style: TextStyle(
-                              color: theme.colorScheme.onSurface)),
-                    ]))
-                  : ElevatedButton.icon(
-                      icon: const Icon(Icons.upload_file),
-                      label: const Text('Choose & Upload Module'),
-                      style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white),
-                      onPressed: _pickAndUploadModule,
-                    ),
-              if (_lastUploadedFileName != null) ...[
-                const SizedBox(height: 12),
-                Row(children: [
-                  const Icon(Icons.check_circle,
-                      color: Colors.green, size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                      child: Text('Last uploaded: $_lastUploadedFileName',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w500,
-                              ) ??
-                              const TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w500))),
-                ]),
-              ],
-
-              const SizedBox(height: 28),
-              const Divider(),
-
-              // Uploaded Modules
-              Text('Uploaded Modules',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ) ??
-                      TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      )),
-              const SizedBox(height: 8),
-              ...DataService.modules.map((m) {
-                return Card(
-                  color: theme.colorScheme.surface,
-                  child: ListTile(
-                    leading: Icon(Icons.book,
-                        color: theme.colorScheme.primary),
-                    title: Text(m.title,
-                        style: theme.textTheme.bodyLarge?.copyWith(
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Teacher Dashboard',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onSurface,
                             ) ??
-                            TextStyle(color: theme.colorScheme.onSurface)),
-                    subtitle: Text(
-                      m.content.length > 60
-                          ? '${m.content.substring(0, 60)}...'
-                          : m.content,
-                      style: theme.textTheme.bodySmall?.copyWith(
+                            TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            )),
+                    const SizedBox(height: 12),
+
+                    // Class Management
+                    Text('Manage Classes',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ) ??
+                            TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            )),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.class_),
+                      label: const Text('Go to Class Management'),
+                      onPressed: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const ClassManagement())),
+                    ),
+
+                    const SizedBox(height: 28),
+                    const Divider(),
+
+                    // Upload Module
+                    Text('Upload Module',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ) ??
+                            TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            )),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Upload a PDF, Word, or TXT file. Mock exams, quizzes, and mini games will automatically update.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ) ??
                           TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.visibility,
+                    const SizedBox(height: 16),
+                    _isUploading
+                        ? Center(
+                            child: Column(children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 8),
+                            Text('Uploading module...',
+                                style: TextStyle(
+                                    color: theme.colorScheme.onSurface)),
+                          ]))
+                        : ElevatedButton.icon(
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Choose & Upload Module'),
+                            style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white),
+                            onPressed: _pickAndUploadModule,
+                          ),
+                    if (_lastUploadedFileName != null) ...[
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        const Icon(Icons.check_circle,
+                            color: Colors.green, size: 18),
+                        const SizedBox(width: 6),
+                        Expanded(
+                            child: Text('Last uploaded: $_lastUploadedFileName',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w500,
+                                    ) ??
+                                    const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w500))),
+                      ]),
+                    ],
+
+                    const SizedBox(height: 28),
+                    const Divider(),
+
+                    // Uploaded Modules
+                    Text('Uploaded Modules',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ) ??
+                            TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            )),
+                    const SizedBox(height: 8),
+                    ...DataService.modules.map((m) {
+                      return Card(
+                        color: theme.colorScheme.surface,
+                        child: ListTile(
+                          leading: Icon(Icons.book,
                               color: theme.colorScheme.primary),
-                          onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      ModuleViewer(module: m))),
+                          title: Text(m.title,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                    color: theme.colorScheme.onSurface,
+                                  ) ??
+                                  TextStyle(color: theme.colorScheme.onSurface)),
+                          subtitle: Text(
+                            m.content.length > 60
+                                ? '${m.content.substring(0, 60)}...'
+                                : m.content,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ) ??
+                                TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.visibility,
+                                    color: theme.colorScheme.primary),
+                                onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            ModuleViewer(module: m))),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
+                                onPressed: () => _confirmDeleteModule(m),
+                              ),
+                            ],
+                          ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete,
-                              color: Colors.red),
-                          onPressed: () => _confirmDeleteModule(m),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

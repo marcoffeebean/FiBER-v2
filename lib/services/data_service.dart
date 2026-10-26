@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:math';
 import 'dart:convert';
 import 'package:archive/archive.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:docx_to_text/docx_to_text.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
-import 'package:docx_to_text/docx_to_text.dart';
+import '../models/alumni_model.dart';
 import '../models/module_model.dart';
 
 class DataService {
@@ -20,12 +22,24 @@ class DataService {
   static final List<ClassRoom> _classes = [];
   static final List<String> _joinedClassCodes = [];
   static final List<String> _systemLogs = [];
+  static final List<AlumniProfile> _alumniProfiles = [];
 
   static List<Module> get modules => List.unmodifiable(_modules);
   static List<ClassRoom> get classes => List.unmodifiable(_classes);
   static List<String> get joinedClassCodes =>
       List.unmodifiable(_joinedClassCodes);
   static List<String> get systemLogs => List.unmodifiable(_systemLogs);
+  static List<AlumniProfile> get alumniProfiles =>
+      List.unmodifiable(_alumniProfiles);
+
+  static List<AlumniProfile> get visibleAlumniProfiles =>
+      List.unmodifiable(
+        [..._alumniProfiles.where((profile) => profile.isVisible)]
+          ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder)),
+      );
+
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final FirebaseStorage _storage = FirebaseStorage.instance;
 
   static ValueNotifier<int> moduleUpdateNotifier = ValueNotifier(0);
   static ValueNotifier<ThemeMode>? _themeModeNotifier;
@@ -533,5 +547,138 @@ class DataService {
 
   static void notifyModuleUpdated() {
     moduleUpdateNotifier.value++;
+  }
+
+  // ── Alumni profiles ─────────────────────────────────────────────
+  static Future<List<AlumniProfile>> loadAlumniProfiles() async {
+    try {
+      final snapshot = await _firestore
+          .collection('alumni_profiles')
+          .orderBy('displayOrder')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final profiles = snapshot.docs
+          .map((doc) => AlumniProfile.fromMap(doc.id, doc.data()))
+          .where((profile) => profile.name.isNotEmpty)
+          .toList();
+
+      _alumniProfiles
+        ..clear()
+        ..addAll(profiles);
+
+      return List.unmodifiable([..._alumniProfiles]);
+    } catch (_) {
+      _alumniProfiles
+        ..clear()
+        ..addAll(_seedAlumniProfiles());
+      return List.unmodifiable([..._alumniProfiles]);
+    }
+  }
+
+  static Future<void> saveAlumniProfile(AlumniProfile profile) async {
+    try {
+      final now = DateTime.now();
+      final data = profile.toMap();
+      final payload = {
+        ...data,
+        'updatedAt': now.toIso8601String(),
+      };
+
+      final docId = profile.id.trim();
+      if (docId.isEmpty) {
+        final ref = await _firestore.collection('alumni_profiles').add(payload);
+        _alumniProfiles.add(profile.copyWith(
+          id: ref.id,
+          updatedAt: now,
+          createdAt: profile.createdAt,
+        ));
+      } else {
+        await _firestore
+            .collection('alumni_profiles')
+            .doc(docId)
+            .set(payload, SetOptions(merge: true));
+
+        final index = _alumniProfiles.indexWhere((item) => item.id == docId);
+        if (index >= 0) {
+          _alumniProfiles[index] = profile.copyWith(updatedAt: now);
+        } else {
+          _alumniProfiles.add(profile.copyWith(updatedAt: now));
+        }
+      }
+      notifyModuleUpdated();
+    } catch (_) {
+      if (!_alumniProfiles.any((item) => item.id == profile.id)) {
+        _alumniProfiles.add(profile);
+      }
+      notifyModuleUpdated();
+    }
+  }
+
+  static Future<void> deleteAlumniProfile(String id) async {
+    try {
+      await _firestore.collection('alumni_profiles').doc(id).delete();
+    } catch (_) {}
+
+    _alumniProfiles.removeWhere((profile) => profile.id == id);
+    notifyModuleUpdated();
+  }
+
+  static Future<String> uploadAlumniImage(String fileName, Uint8List bytes) async {
+    try {
+      final storageRef = _storage.ref().child('alumni_profiles/$fileName');
+      final uploadTask = await storageRef.putData(bytes);
+      return await uploadTask.ref.getDownloadURL();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static List<AlumniProfile> _seedAlumniProfiles() {
+    final now = DateTime.now();
+    return [
+      AlumniProfile(
+        id: 'sample-1',
+        name: 'Marjorie Dela Cruz',
+        title: 'Fisheries Officer',
+        company: 'BFAR Region 8',
+        batchYear: '2021',
+        salary: '₱48,000/mo',
+        imageUrl: '',
+        highlight: 'Now helping monitor fishery sustainability and coastal programs.',
+        isVisible: true,
+        displayOrder: 1,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      AlumniProfile(
+        id: 'sample-2',
+        name: 'Rafael Santos',
+        title: 'Quality Assurance Analyst',
+        company: 'SeaFresh Foods',
+        batchYear: '2019',
+        salary: '₱62,000/mo',
+        imageUrl: '',
+        highlight: 'Applies quality assurance and product safety standards in the seafood industry.',
+        isVisible: true,
+        displayOrder: 2,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      AlumniProfile(
+        id: 'sample-3',
+        name: 'Leah Magbanua',
+        title: 'Aquaculture Specialist',
+        company: 'Coastal Harvest',
+        batchYear: '2022',
+        salary: '₱55,000/mo',
+        imageUrl: '',
+        highlight: 'Supports sustainable fish farming and production planning in local communities.',
+        isVisible: true,
+        displayOrder: 3,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
   }
 }

@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../models/alumni_model.dart';
 import '../services/auth_service.dart';
 import '../services/data_service.dart';
 import 'account_settings.dart';
@@ -283,7 +285,7 @@ class _AdminPanelState extends State<AdminPanel> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     decoration: const InputDecoration(labelText: 'Role'),
                     items: const [
                       DropdownMenuItem(
@@ -351,6 +353,169 @@ class _AdminPanelState extends State<AdminPanel> {
         context,
       ).showSnackBar(const SnackBar(content: Text('Failed to update user.')));
     }
+  }
+
+  Future<void> _showAlumniDialog({AlumniProfile? profile}) async {
+    final isEditing = profile != null;
+    final nameCtrl = TextEditingController(text: profile?.name ?? '');
+    final titleCtrl = TextEditingController(text: profile?.title ?? '');
+    final companyCtrl = TextEditingController(text: profile?.company ?? '');
+    final batchCtrl = TextEditingController(text: profile?.batchYear ?? '');
+    final salaryCtrl = TextEditingController(text: profile?.salary ?? '');
+    final highlightCtrl = TextEditingController(text: profile?.highlight ?? '');
+    final orderCtrl = TextEditingController(
+      text: (profile?.displayOrder ?? DataService.alumniProfiles.length + 1).toString(),
+    );
+    String imageUrl = profile?.imageUrl ?? '';
+    bool isVisible = profile?.isVisible ?? true;
+    bool isSaving = false;
+    final formKey = GlobalKey<FormState>();
+
+    final pickedFile = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (pickedFile != null && pickedFile.files.isNotEmpty) {
+      final file = pickedFile.files.first;
+      if (file.bytes != null) {
+        final uploadedUrl = await DataService.uploadAlumniImage(
+          file.name,
+          file.bytes!,
+        );
+        if (uploadedUrl.isNotEmpty) {
+          imageUrl = uploadedUrl;
+        }
+      }
+    }
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(isEditing ? 'Edit Alumni Profile' : 'Add Alumni Profile'),
+          content: SizedBox(
+            width: 480,
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(labelText: 'Name'),
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(labelText: 'Job Title'),
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: companyCtrl,
+                      decoration: const InputDecoration(labelText: 'Company'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: batchCtrl,
+                      decoration: const InputDecoration(labelText: 'Batch Year'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: salaryCtrl,
+                      decoration: const InputDecoration(labelText: 'Salary'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: highlightCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Highlight'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: orderCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Display Order'),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      value: isVisible,
+                      onChanged: (value) => setDialogState(() => isVisible = value),
+                      title: const Text('Visible on front page'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    if (imageUrl.isNotEmpty)
+                      SizedBox(
+                        height: 90,
+                        child: Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.network(
+                              imageUrl,
+                              height: 80,
+                              width: 80,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isSaving = true);
+
+                      final finalProfile = AlumniProfile(
+                        id: profile?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                        name: nameCtrl.text.trim(),
+                        title: titleCtrl.text.trim(),
+                        company: companyCtrl.text.trim(),
+                        batchYear: batchCtrl.text.trim(),
+                        salary: salaryCtrl.text.trim(),
+                        imageUrl: imageUrl,
+                        highlight: highlightCtrl.text.trim(),
+                        isVisible: isVisible,
+                        displayOrder: int.tryParse(orderCtrl.text.trim()) ?? 0,
+                        createdAt: profile?.createdAt ?? DateTime.now(),
+                        updatedAt: DateTime.now(),
+                      );
+
+                      await DataService.saveAlumniProfile(finalProfile);
+                      if (!mounted) return;
+                      setState(() {});
+                      Navigator.pop(dialogContext);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isEditing ? 'Alumni profile updated.' : 'Alumni profile added.',
+                          ),
+                        ),
+                      );
+                    },
+              child: isSaving ? const Text('Saving...') : const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -508,12 +673,32 @@ class _AdminPanelState extends State<AdminPanel> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: _selectedTab == 0
-            ? _buildSystemLogs(theme)
-            : _selectedTab == 1
-            ? _buildAppContent(theme)
-            : _buildUserAccounts(theme),
+      body: Container(
+        decoration: BoxDecoration(
+          color: Colors.lightBlue.shade50,
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.7,
+                child: Image.asset(
+                  'lib/assets/images/Minimalist Blue Fish Pattern.png',
+                  fit: BoxFit.cover,
+                  color: Colors.lightBlue.shade200,
+                  colorBlendMode: BlendMode.modulate,
+                ),
+              ),
+            ),
+            SafeArea(
+              child: _selectedTab == 0
+                  ? _buildSystemLogs(theme)
+                  : _selectedTab == 1
+                      ? _buildAppContent(theme)
+                      : _buildUserAccounts(theme),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -618,11 +803,134 @@ class _AdminPanelState extends State<AdminPanel> {
 
   Widget _buildAppContent(ThemeData theme) {
     final modules = DataService.modules;
+    final sortedAlumniProfiles = [...DataService.alumniProfiles]
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: ListView(
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'App Content',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person_add_alt_1, size: 16),
+                label: const Text('Add Alumni'),
+                onPressed: () => _showAlumniDialog(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Featured Alumni',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (sortedAlumniProfiles.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No alumni profiles yet. Add one to feature on the front page.',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            )
+          else
+            ...sortedAlumniProfiles.map(
+              (alumni) => Card(
+                color: theme.colorScheme.surface,
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.lightBlueAccent,
+                    backgroundImage: alumni.imageUrl.isNotEmpty
+                        ? NetworkImage(alumni.imageUrl)
+                        : null,
+                    child: alumni.imageUrl.isEmpty
+                        ? Text(
+                            alumni.name.isNotEmpty
+                                ? alumni.name[0].toUpperCase()
+                                : 'A',
+                            style: const TextStyle(color: Colors.white),
+                          )
+                        : null,
+                  ),
+                  title: Text(alumni.name),
+                  subtitle: Text(
+                    '${alumni.title}${alumni.company.isNotEmpty ? ' • ${alumni.company}' : ''}\nVisible: ${alumni.isVisible ? 'Yes' : 'No'} • Order: ${alumni.displayOrder}',
+                  ),
+                  isThreeLine: true,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          alumni.isVisible ? Icons.visibility : Icons.visibility_off,
+                          color: alumni.isVisible ? Colors.green : Colors.grey,
+                        ),
+                        tooltip: alumni.isVisible ? 'Hide from public' : 'Show on public page',
+                        onPressed: () async {
+                          await DataService.saveAlumniProfile(
+                            alumni.copyWith(
+                              isVisible: !alumni.isVisible,
+                              updatedAt: DateTime.now(),
+                            ),
+                          );
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _showAlumniDialog(profile: alumni),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Delete Alumni'),
+                              content: Text(
+                                'Remove ${alumni.name} from the public section?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            await DataService.deleteAlumniProfile(alumni.id);
+                            if (mounted) setState(() {});
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 20),
           Text(
             'Uploaded Modules',
             style: TextStyle(
@@ -632,47 +940,47 @@ class _AdminPanelState extends State<AdminPanel> {
             ),
           ),
           const SizedBox(height: 8),
-          Expanded(
-            child: modules.isEmpty
-                ? Center(
-                    child: Text(
-                      'No modules uploaded yet.',
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+          modules.isEmpty
+              ? Center(
+                  child: Text(
+                    'No modules uploaded yet.',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: modules.length,
-                    itemBuilder: (_, i) {
-                      final module = modules[i];
-                      return Card(
-                        color: theme.colorScheme.surface,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.book,
-                            color: theme.colorScheme.primary,
-                          ),
-                          title: Text(
-                            module.title,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          subtitle: Text(
-                            module.content.length > 60
-                                ? '${module.content.substring(0, 60)}...'
-                                : module.content,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: modules.length,
+                  itemBuilder: (_, i) {
+                    final module = modules[i];
+                    return Card(
+                      color: theme.colorScheme.surface,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.book,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: Text(
+                          module.title,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
-                      );
-                    },
-                  ),
-          ),
+                        subtitle: Text(
+                          module.content.length > 60
+                              ? '${module.content.substring(0, 60)}...'
+                              : module.content,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ],
       ),
     );
