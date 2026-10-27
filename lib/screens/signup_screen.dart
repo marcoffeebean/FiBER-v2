@@ -23,8 +23,6 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    // Everyone signs up as student by default
-    // Admin promotes users to teacher/admin later
     final user = await AuthService.signUp(
       _emailCtrl.text.trim(),
       _passwordCtrl.text,
@@ -59,11 +57,33 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Container(
           color: const Color.fromARGB(160, 0, 0, 0),
           child: SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: _buildGlassCard(),
-              ),
+            child: Column(
+              children: [
+                // ── Back button ─────────────────────────────────
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 4),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new,
+                          color: Colors.lightBlueAccent),
+                      onPressed: () =>
+                          Navigator.pushReplacementNamed(context, '/'),
+                      tooltip: 'Back to Home',
+                    ),
+                  ),
+                ),
+
+                // ── Form ────────────────────────────────────────
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: _buildGlassCard(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -97,17 +117,13 @@ class _SignupScreenState extends State<SignupScreen> {
               'Create your account to get started',
               style: TextStyle(color: Colors.white70),
             ),
-            const SizedBox(height: 8),
-            
             const SizedBox(height: 16),
-            _buildTextField(
-                controller: _nameCtrl, label: 'Full Name'),
+            _buildTextField(controller: _nameCtrl, label: 'Full Name'),
             const SizedBox(height: 16),
             _buildTextField(
                 controller: _usernameCtrl, label: 'Username'),
             const SizedBox(height: 16),
-            _buildTextField(
-                controller: _emailCtrl, label: 'Email'),
+            _buildTextField(controller: _emailCtrl, label: 'Email'),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _passwordCtrl,
@@ -162,8 +178,7 @@ class _SignupScreenState extends State<SignupScreen> {
         if (label == 'Password' && v.length < 6) {
           return 'Password must be at least 6 characters';
         }
-        if (label == 'Confirm Password' &&
-            v != _passwordCtrl.text) {
+        if (label == 'Confirm Password' && v != _passwordCtrl.text) {
           return 'Passwords do not match';
         }
         return null;

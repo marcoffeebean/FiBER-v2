@@ -93,7 +93,7 @@ class AboutUsScreen extends StatelessWidget {
           const SizedBox(height: 32),
           Center(
             child: Text(
-              '© 2025 FiBER Development Team',
+              '© 2026 FiBER Development Team. All rights reserved.',
               style: TextStyle(
                   color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
             ),

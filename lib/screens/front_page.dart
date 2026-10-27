@@ -171,6 +171,7 @@ class _FrontPageState extends State<FrontPage> {
                       children: [
                         Text(
                           'Our Successful BFAS Alumni',
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.playfairDisplay(
                             fontSize: 26,
                             fontWeight: FontWeight.bold,
@@ -178,8 +179,9 @@ class _FrontPageState extends State<FrontPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Text(
+                        const Text(
                           'Proud graduates who turned their passion for fisheries into meaningful careers and real impact.',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                            color: Colors.white,
                             fontSize: 15,
@@ -209,7 +211,7 @@ class _FrontPageState extends State<FrontPage> {
                                 return Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: const Color.fromARGB(169, 6, 100, 241),
+                                    color: const Color(0xFFF0F8FF),
                                     borderRadius: BorderRadius.circular(18),
                                     border: Border.all(
                                       color: Colors.lightBlue.shade100,
@@ -273,7 +275,7 @@ class _FrontPageState extends State<FrontPage> {
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.blue.shade700,
+                                          color: const Color.fromARGB(255, 20, 90, 161),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
