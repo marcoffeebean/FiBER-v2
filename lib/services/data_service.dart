@@ -32,11 +32,10 @@ class DataService {
   static List<AlumniProfile> get alumniProfiles =>
       List.unmodifiable(_alumniProfiles);
 
-  static List<AlumniProfile> get visibleAlumniProfiles =>
-      List.unmodifiable(
-        [..._alumniProfiles.where((profile) => profile.isVisible)]
-          ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder)),
-      );
+  static List<AlumniProfile> get visibleAlumniProfiles => List.unmodifiable(
+    [..._alumniProfiles.where((profile) => profile.isVisible)]
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder)),
+  );
 
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -163,22 +162,26 @@ class DataService {
 
       // Collect slide files and sort by slide number
       final slideFiles = archive.files
-          .where((f) =>
-              f.name.startsWith('ppt/slides/slide') &&
-              f.name.endsWith('.xml') &&
-              !f.name.contains('slideLayout') &&
-              !f.name.contains('slideMaster'))
+          .where(
+            (f) =>
+                f.name.startsWith('ppt/slides/slide') &&
+                f.name.endsWith('.xml') &&
+                !f.name.contains('slideLayout') &&
+                !f.name.contains('slideMaster'),
+          )
           .toList();
 
       slideFiles.sort((a, b) {
         // Extract slide number from filename e.g. slide1.xml → 1
-        final aNum = int.tryParse(
-                RegExp(r'slide(\d+)\.xml').firstMatch(a.name)?.group(1) ??
-                    '0') ??
+        final aNum =
+            int.tryParse(
+              RegExp(r'slide(\d+)\.xml').firstMatch(a.name)?.group(1) ?? '0',
+            ) ??
             0;
-        final bNum = int.tryParse(
-                RegExp(r'slide(\d+)\.xml').firstMatch(b.name)?.group(1) ??
-                    '0') ??
+        final bNum =
+            int.tryParse(
+              RegExp(r'slide(\d+)\.xml').firstMatch(b.name)?.group(1) ?? '0',
+            ) ??
             0;
         return aNum.compareTo(bNum);
       });
@@ -187,20 +190,24 @@ class DataService {
       for (final file in slideFiles) {
         if (!file.isFile) continue;
         try {
-          final xmlContent = utf8.decode(file.content as List<int>,
-              allowMalformed: true);
+          final xmlContent = utf8.decode(
+            file.content as List<int>,
+            allowMalformed: true,
+          );
 
           // Extract text runs preserving paragraph breaks
           final paragraphs = <String>[];
-          final paraMatches =
-              RegExp(r'<a:p[>\s][^]*?</a:p>').allMatches(xmlContent);
+          final paraMatches = RegExp(
+            r'<a:p[>\s][^]*?</a:p>',
+          ).allMatches(xmlContent);
 
           for (final para in paraMatches) {
             final paraXml = para.group(0) ?? '';
             // Extract text elements within paragraph
             final textParts = <String>[];
-            final textMatches =
-                RegExp(r'<a:t[>\s][^]*?</a:t>').allMatches(paraXml);
+            final textMatches = RegExp(
+              r'<a:t[>\s][^]*?</a:t>',
+            ).allMatches(paraXml);
             for (final t in textMatches) {
               final raw = t.group(0) ?? '';
               final text = _stripXml(raw).trim();
@@ -254,19 +261,21 @@ class DataService {
         orElse: () => archive.files.first,
       );
 
-      final xmlContent =
-          utf8.decode(docFile.content as List<int>, allowMalformed: true);
+      final xmlContent = utf8.decode(
+        docFile.content as List<int>,
+        allowMalformed: true,
+      );
 
       // Extract paragraphs preserving structure
       final paragraphs = <String>[];
-      final paraMatches =
-          RegExp(r'<w:p[ >][^]*?</w:p>').allMatches(xmlContent);
+      final paraMatches = RegExp(r'<w:p[ >][^]*?</w:p>').allMatches(xmlContent);
 
       for (final para in paraMatches) {
         final paraXml = para.group(0) ?? '';
         final textParts = <String>[];
-        final textMatches =
-            RegExp(r'<w:t[^>]*>([^<]*)</w:t>').allMatches(paraXml);
+        final textMatches = RegExp(
+          r'<w:t[^>]*>([^<]*)</w:t>',
+        ).allMatches(paraXml);
         for (final t in textMatches) {
           final text = t.group(1)?.trim() ?? '';
           if (text.isNotEmpty) textParts.add(text);
@@ -294,7 +303,10 @@ class DataService {
 
       for (int i = 0; i < document.pages.count; i++) {
         try {
-          final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
+          final pageText = extractor.extractText(
+            startPageIndex: i,
+            endPageIndex: i,
+          );
           final trimmed = pageText.trim();
           if (trimmed.isNotEmpty) {
             pageBuffer.writeln('--- Page ${i + 1} ---');
@@ -308,7 +320,9 @@ class DataService {
 
       document.dispose();
       final result = pageBuffer.toString().trim();
-      debugPrint('PDF extracted: ${result.length} chars, ${document.pages.count} pages');
+      debugPrint(
+        'PDF extracted: ${result.length} chars, ${document.pages.count} pages',
+      );
       return result;
     } catch (e) {
       debugPrint('PDF extraction error: $e');
@@ -404,10 +418,12 @@ class DataService {
 
       final allWords = cleanContent
           .split(RegExp(r'[^a-zA-Z]+'))
-          .where((w) =>
-              w.length > 4 &&
-              w != keyword &&
-              RegExp(r'^[a-zA-Z]+$').hasMatch(w))
+          .where(
+            (w) =>
+                w.length > 4 &&
+                w != keyword &&
+                RegExp(r'^[a-zA-Z]+$').hasMatch(w),
+          )
           .toSet()
           .toList();
 
@@ -417,11 +433,13 @@ class DataService {
 
       final choices = [...wrongAnswers, keyword]..shuffle(random);
 
-      questions.add(Question(
-        question: blankSentence,
-        choices: choices,
-        correctIndex: choices.indexOf(keyword),
-      ));
+      questions.add(
+        Question(
+          question: blankSentence,
+          choices: choices,
+          correctIndex: choices.indexOf(keyword),
+        ),
+      );
     }
 
     debugPrint('Generated ${questions.length} questions');
@@ -445,10 +463,35 @@ class DataService {
   }
 
   // ── Upload module ──────────────────────────────────────────────
-  static void uploadModule(Module module) {
-    _modules.add(module);
-    _log('Module uploaded: ${module.title}');
-    notifyModuleUpdated();
+  static Future<void> uploadModule(Module module) async {
+    try {
+      final docRef = await _firestore.collection('modules').add({
+        ...module.toMap(),
+        'uploadedAt': FieldValue.serverTimestamp(),
+      });
+
+      final savedModule = Module(
+        id: docRef.id,
+        title: module.title,
+        content: module.content,
+        questions: module.questions,
+        isValid: module.isValid,
+        fileName: module.fileName,
+        fileType: module.fileType,
+        fileUrl: module.fileUrl,
+        fileSize: module.fileSize,
+        pageCount: module.pageCount,
+        uploadedAt: module.uploadedAt ?? DateTime.now(),
+      );
+
+      _modules.add(savedModule);
+
+      _log('Module uploaded: ${module.title}');
+      notifyModuleUpdated();
+    } catch (e) {
+      debugPrint('Error saving module to Firestore: $e');
+      rethrow;
+    }
   }
 
   static Future<void> uploadModuleFile({
@@ -457,44 +500,114 @@ class DataService {
     Uint8List? bytes,
     String? filePath,
   }) async {
-    debugPrint(
-        'Uploading: $fileName | bytes: ${bytes?.length} | path: $filePath');
+    try {
+      debugPrint(
+        'Uploading: $fileName | bytes: ${bytes?.length} | path: $filePath',
+      );
 
-    String content = await _extractText(
-      fileName: fileName,
-      bytes: bytes,
-      filePath: filePath,
-    );
+      // Read the original file bytes.
+      final fileBytes = await _getBytes(bytes: bytes, filePath: filePath);
 
-    debugPrint('Extracted content length: ${content.length}');
-    if (content.length > 200) {
-      debugPrint('Preview: ${content.substring(0, 200)}');
+      if (fileBytes == null || fileBytes.isEmpty) {
+        throw Exception('The selected file is empty or could not be read.');
+      }
+
+      // Extract the document text.
+      String content = await _extractText(
+        fileName: fileName,
+        bytes: fileBytes,
+        filePath: filePath,
+      );
+
+      debugPrint('Extracted content length: ${content.length}');
+
+      if (content.length > 200) {
+        debugPrint('Preview: ${content.substring(0, 200)}');
+      }
+
+      if (content.trim().isEmpty) {
+        content =
+            'Module content could not be extracted. Please re-upload the file.';
+      }
+
+      // Generate quiz questions from the extracted content.
+      final questions = _generateQuestions(content);
+
+      // Get the file extension.
+      final extension = fileName.contains('.')
+          ? fileName.split('.').last.toLowerCase()
+          : '';
+      // Save the module and metadata in Firestore.
+      final docRef = await _firestore.collection('modules').add({
+        'title': title,
+        'content': content,
+        'questions': questions.map((q) => q.toMap()).toList(),
+        'isValid': true,
+        'fileName': fileName,
+        'fileType': extension,
+        'fileUrl': null,
+        'fileSize': fileBytes.length,
+        'pageCount': null,
+        'uploadedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      // Update the local list only after the cloud save succeeds.
+      _modules.add(
+        Module(
+          id: docRef.id,
+          title: title,
+          content: content,
+          questions: questions,
+          fileName: fileName,
+          fileType: extension,
+          fileUrl: null,
+          fileSize: fileBytes.length,
+          uploadedAt: DateTime.now(),
+        ),
+      );
+
+      _log(
+        'Module uploaded: $fileName '
+        '(${questions.length} questions generated)',
+      );
+
+      notifyModuleUpdated();
+    } catch (e, stackTrace) {
+      debugPrint('Error uploading module file: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
     }
-
-    if (content.trim().isEmpty) {
-      content =
-          'Module content could not be extracted. Please re-upload the file.';
-      debugPrint('Warning: extraction returned empty content for $fileName');
-    }
-
-    final questions = _generateQuestions(content);
-
-    _modules.add(Module(
-      title: title,
-      content: content,
-      questions: questions,
-    ));
-
-    _log('Module uploaded: $fileName (${questions.length} questions generated)');
-    notifyModuleUpdated();
   }
 
   // ── Delete module ──────────────────────────────────────────────
-  static void deleteModule(int index) {
+  static Future<void> deleteModule(int index) async {
     if (index < 0 || index >= _modules.length) return;
-    _log('Module deleted: ${_modules[index].title}');
-    _modules.removeAt(index);
-    notifyModuleUpdated();
+
+    final module = _modules[index];
+
+    try {
+      // Delete the original file from Storage when a URL exists.
+      if (module.fileUrl != null && module.fileUrl!.isNotEmpty) {
+        try {
+          await _storage.refFromURL(module.fileUrl!).delete();
+        } catch (e) {
+          debugPrint('Could not delete the original module file: $e');
+        }
+      }
+
+      // Delete the Firestore document.
+      if (module.id != null && module.id!.isNotEmpty) {
+        await _firestore.collection('modules').doc(module.id).delete();
+      }
+
+      _modules.removeAt(index);
+
+      _log('Module deleted: ${module.title}');
+      notifyModuleUpdated();
+    } catch (e) {
+      debugPrint('Error deleting module: $e');
+      rethrow;
+    }
   }
 
   // ── Class methods ──────────────────────────────────────────────
@@ -519,11 +632,9 @@ class DataService {
     final normalizedId = id.trim().toUpperCase();
     if (normalizedId.isEmpty) return false;
 
-    final found =
-        _classes.any((c) => c.id.toUpperCase() == normalizedId);
+    final found = _classes.any((c) => c.id.toUpperCase() == normalizedId);
     if (found &&
-        !_joinedClassCodes
-            .any((code) => code.toUpperCase() == normalizedId)) {
+        !_joinedClassCodes.any((code) => code.toUpperCase() == normalizedId)) {
       _joinedClassCodes.add(normalizedId);
     }
 
@@ -535,18 +646,41 @@ class DataService {
 
   static void leaveClass(String id) {
     final normalizedId = id.trim().toUpperCase();
-    _joinedClassCodes
-        .removeWhere((code) => code.toUpperCase() == normalizedId);
+    _joinedClassCodes.removeWhere((code) => code.toUpperCase() == normalizedId);
   }
 
   static bool hasJoinedClass(String id) {
     final normalizedId = id.trim().toUpperCase();
-    return _joinedClassCodes
-        .any((code) => code.toUpperCase() == normalizedId);
+    return _joinedClassCodes.any((code) => code.toUpperCase() == normalizedId);
   }
 
   static void notifyModuleUpdated() {
     moduleUpdateNotifier.value++;
+  }
+
+  // ── Load modules from Firestore ──────────────────────
+  static Future<void> loadModules() async {
+    try {
+      final snapshot = await _firestore
+          .collection('modules')
+          .orderBy('uploadedAt', descending: true)
+          .get();
+
+      _modules
+        ..clear()
+        ..addAll(
+          snapshot.docs.map((doc) {
+            return Module.fromMap(doc.data(), id: doc.id);
+          }),
+        );
+
+      notifyModuleUpdated();
+
+      debugPrint('Loaded ${_modules.length} modules from Firestore.');
+    } catch (e) {
+      debugPrint('Error loading modules from Firestore: $e');
+      rethrow;
+    }
   }
 
   // ── Alumni profiles ─────────────────────────────────────────────
@@ -580,19 +714,18 @@ class DataService {
     try {
       final now = DateTime.now();
       final data = profile.toMap();
-      final payload = {
-        ...data,
-        'updatedAt': now.toIso8601String(),
-      };
+      final payload = {...data, 'updatedAt': now.toIso8601String()};
 
       final docId = profile.id.trim();
       if (docId.isEmpty) {
         final ref = await _firestore.collection('alumni_profiles').add(payload);
-        _alumniProfiles.add(profile.copyWith(
-          id: ref.id,
-          updatedAt: now,
-          createdAt: profile.createdAt,
-        ));
+        _alumniProfiles.add(
+          profile.copyWith(
+            id: ref.id,
+            updatedAt: now,
+            createdAt: profile.createdAt,
+          ),
+        );
       } else {
         await _firestore
             .collection('alumni_profiles')
@@ -624,7 +757,10 @@ class DataService {
     notifyModuleUpdated();
   }
 
-  static Future<String> uploadAlumniImage(String fileName, Uint8List bytes) async {
+  static Future<String> uploadAlumniImage(
+    String fileName,
+    Uint8List bytes,
+  ) async {
     try {
       final storageRef = _storage.ref().child('alumni_profiles/$fileName');
       final uploadTask = await storageRef.putData(bytes);
@@ -645,7 +781,8 @@ class DataService {
         batchYear: '2021',
         salary: '₱48,000/mo',
         imageUrl: '',
-        highlight: 'Now helping monitor fishery sustainability and coastal programs.',
+        highlight:
+            'Now helping monitor fishery sustainability and coastal programs.',
         isVisible: true,
         displayOrder: 1,
         createdAt: now,
@@ -659,7 +796,8 @@ class DataService {
         batchYear: '2019',
         salary: '₱62,000/mo',
         imageUrl: '',
-        highlight: 'Applies quality assurance and product safety standards in the seafood industry.',
+        highlight:
+            'Applies quality assurance and product safety standards in the seafood industry.',
         isVisible: true,
         displayOrder: 2,
         createdAt: now,
@@ -673,7 +811,8 @@ class DataService {
         batchYear: '2022',
         salary: '₱55,000/mo',
         imageUrl: '',
-        highlight: 'Supports sustainable fish farming and production planning in local communities.',
+        highlight:
+            'Supports sustainable fish farming and production planning in local communities.',
         isVisible: true,
         displayOrder: 3,
         createdAt: now,
