@@ -724,9 +724,9 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD6F0F5),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFD6F0F5),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: const BackButton(color: Colors.black),
         title: const Text(
@@ -1076,9 +1076,9 @@ class _StudySessionState extends State<_StudySession> {
     final total = widget.deck.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFD6F0F5),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFD6F0F5),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: BackButton(
           color: Colors.black,

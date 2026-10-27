@@ -21,57 +21,18 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         backgroundColor:
             theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
-        title: Text('System Settings',
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface)),
+        title: Text(
+          'System Settings',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
         centerTitle: true,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── Theme ────────────────────────────────────────────
-          _SectionHeader(icon: Icons.brightness_6, title: 'Theme'),
-          const SizedBox(height: 12),
-          _OptionCard(
-            child: Column(
-              children: [
-                RadioListTile<ThemeMode>(
-                  title: Text('Light Mode',
-                      style:
-                          TextStyle(color: theme.colorScheme.onSurface)),
-                  secondary: Icon(Icons.light_mode,
-                      color: theme.colorScheme.primary),
-                  value: ThemeMode.light,
-                  groupValue: currentTheme,
-                  onChanged: (value) {
-                    if (value != null) {
-                      DataService.setThemeMode(value);
-                      setState(() {});
-                    }
-                  },
-                ),
-                Divider(
-                    color: theme.colorScheme.onSurface.withOpacity(0.1)),
-                RadioListTile<ThemeMode>(
-                  title: Text('Dark Mode',
-                      style:
-                          TextStyle(color: theme.colorScheme.onSurface)),
-                  secondary: Icon(Icons.dark_mode,
-                      color: theme.colorScheme.primary),
-                  value: ThemeMode.dark,
-                  groupValue: currentTheme,
-                  onChanged: (value) {
-                    if (value != null) {
-                      DataService.setThemeMode(value);
-                      setState(() {});
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-
           const SizedBox(height: 24),
 
           // ── Font Settings ─────────────────────────────────────
@@ -81,47 +42,16 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Text('Font Family',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonFormField<String>(
-                    value: currentFont,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'Roboto', child: Text('Roboto')),
-                      DropdownMenuItem(value: 'sans-serif', child: Text('Sans Serif')),
-                      DropdownMenuItem(value: 'serif', child: Text('Serif')),
-                      DropdownMenuItem(value: 'monospace', child: Text('Monospace')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        DataService.setFontFamily(value);
-                        setState(() {});
-                      }
-                    },
-                  ),
-                ),
                 const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Text('Font Size',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface)),
+                  child: Text(
+                    'Font Size',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
                 ),
                 ValueListenableBuilder<double>(
                   valueListenable: DataService.fontSizeNotifier,
@@ -129,8 +59,10 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        Icon(Icons.text_decrease,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        Icon(
+                          Icons.text_decrease,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         Expanded(
                           child: Slider(
                             value: fontSize,
@@ -143,13 +75,18 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                             },
                           ),
                         ),
-                        Icon(Icons.text_increase,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        Icon(
+                          Icons.text_increase,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         const SizedBox(width: 8),
-                        Text('${fontSize.toStringAsFixed(0)}px',
-                            style: TextStyle(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w600)),
+                        Text(
+                          '${fontSize.toStringAsFixed(0)}px',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -162,8 +99,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                     builder: (_, fontSize, __) => Text(
                       'Preview: The quick brown fox jumps over the lazy dog',
                       style: TextStyle(
-                          fontSize: fontSize,
-                          color: theme.colorScheme.onSurface),
+                        fontSize: fontSize,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                   ),
                 ),
@@ -189,11 +127,14 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Icon(icon, color: theme.colorScheme.primary, size: 20),
         const SizedBox(width: 8),
-        Text(title,
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: theme.colorScheme.onSurface)),
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
       ],
     );
   }
@@ -212,9 +153,10 @@ class _OptionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: theme.shadowColor.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 3))
+            color: theme.shadowColor.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: child,
