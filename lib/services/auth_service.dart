@@ -109,6 +109,22 @@ class AuthService {
     }
   }
 
+  // Keeps the in-memory user in sync after account edits.
+  // Email is intentionally not updated here; it changes only after verification.
+  static void updateCachedProfile({String? username, String? photoUrl}) {
+    final c = _currentUser;
+    if (c == null) return;
+    _currentUser = AppUser(
+      id: c.id,
+      email: c.email,
+      role: c.role,
+      username: username ?? c.username,
+      name: c.name,
+      password: c.password,
+      photoUrl: photoUrl ?? c.photoUrl,
+    );
+  }
+
   // ── Logout ─────────────────────────────────────────────────────
   static Future<void> logout() async {
     await _auth.signOut();
@@ -132,8 +148,7 @@ class AuthService {
       final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
 
       // Create teacher account using secondary app
-      final credential =
-          await secondaryAuth.createUserWithEmailAndPassword(
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -238,10 +253,9 @@ class AuthService {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser != null && _currentUser != null) {
-        await _db
-            .collection('users')
-            .doc(currentUser.uid)
-            .update({'username': newUsername});
+        await _db.collection('users').doc(currentUser.uid).update({
+          'username': newUsername,
+        });
         _currentUser = AppUser(
           id: _currentUser!.id,
           email: _currentUser!.email,

@@ -56,15 +56,6 @@ class DataService {
   static String get selectedFontFamily => fontFamilyNotifier.value;
   static double get fontScale => fontSizeNotifier.value / 14.0;
 
-  static void setThemeMode(ThemeMode value) {
-    themeModeNotifier.value = value;
-  }
-
-  static void setFontFamily(String value) {
-    if (value.trim().isEmpty) return;
-    fontFamilyNotifier.value = value;
-  }
-
   static void setFontSize(double size) {
     fontSizeNotifier.value = size;
   }

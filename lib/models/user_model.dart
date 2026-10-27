@@ -1,4 +1,4 @@
-enum UserRole { teacher, student, admin}
+enum UserRole { teacher, student, admin }
 
 class AppUser {
   final String id;
@@ -7,6 +7,7 @@ class AppUser {
   final String username;
   final String name;
   final String password;
+  final String? photoUrl;
 
   AppUser({
     required this.id,
@@ -15,5 +16,6 @@ class AppUser {
     required this.username,
     required this.name,
     required this.password,
+    this.photoUrl,
   });
 }
