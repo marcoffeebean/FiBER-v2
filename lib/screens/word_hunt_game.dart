@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 
@@ -129,6 +129,8 @@ class _WordHuntGameState extends State<WordHuntGame> {
   final Random _random = Random();
   final List<_CellPosition> _selectedPositions = [];
   final Set<String> _foundWords = <String>{};
+  final Map<String, Set<_CellPosition>> _foundWordCells =
+      <String, Set<_CellPosition>>{};
 
   List<String> _targetWords = [];
   Map<String, List<_CellPosition>> _wordPositions = {};
@@ -201,6 +203,7 @@ class _WordHuntGameState extends State<WordHuntGame> {
     _selectedPositions.clear();
     _currentWord = '';
     _foundWords.clear();
+    _foundWordCells.clear();
     _wordPositions.clear();
     _sessionLogged = false;
 
@@ -277,7 +280,8 @@ class _WordHuntGameState extends State<WordHuntGame> {
           .toList();
 
       for (final token in tokens) {
-        if (token.length < level.minWordLength || token.length > level.maxWordLength) {
+        if (token.length < level.minWordLength ||
+            token.length > level.maxWordLength) {
           continue;
         }
         if (token.length > level.gridSize) {
@@ -306,10 +310,7 @@ class _WordHuntGameState extends State<WordHuntGame> {
   List<List<_GridCell>> _buildEmptyGrid(int size) {
     return List.generate(
       size,
-      (row) => List.generate(
-        size,
-        (col) => _GridCell(row, col, null),
-      ),
+      (row) => List.generate(size, (col) => _GridCell(row, col, null)),
     );
   }
 
@@ -319,18 +320,26 @@ class _WordHuntGameState extends State<WordHuntGame> {
     List<String> words,
     int gridSize,
   ) {
-    for (int attempt = 0; attempt < 80; attempt++) {
-      final grid = _buildEmptyGrid(gridSize);
-      bool allPlaced = true;
+    final shuffledWords = [...words]..shuffle(_random);
 
-      for (final word in words) {
-        if (!_placeWord(grid, word)) {
-          allPlaced = false;
+    for (int attempt = 0; attempt < 300; attempt++) {
+      final grid = _buildEmptyGrid(gridSize);
+      bool placedAll = true;
+
+      for (final word in shuffledWords) {
+        final placement = _findPlacementForWord(grid, word);
+        if (placement == null) {
+          placedAll = false;
           break;
+        }
+
+        for (int index = 0; index < placement.length; index++) {
+          final point = placement[index];
+          grid[point.row][point.col].letter = word[index];
         }
       }
 
-      if (!allPlaced) {
+      if (!placedAll) {
         continue;
       }
 
@@ -342,78 +351,79 @@ class _WordHuntGameState extends State<WordHuntGame> {
         }
       }
 
-      return grid;
+      final allWordsPresent = shuffledWords.every(
+        (word) => _findWordPositionsInGrid(grid, word).isNotEmpty,
+      );
+
+      if (allWordsPresent) {
+        return grid;
+      }
     }
 
     return null;
   }
 
-  bool _placeWord(List<List<_GridCell>> grid, String word) {
-    final gridSize = grid.length;
-    final directions = <_CellPosition>[
-      const _CellPosition(0, 1),
-      const _CellPosition(0, -1),
-      const _CellPosition(1, 0),
-      const _CellPosition(-1, 0),
-      const _CellPosition(1, 1),
-      const _CellPosition(-1, -1),
-      const _CellPosition(1, -1),
-      const _CellPosition(-1, 1),
+  List<_CellPosition>? _findPlacementForWord(
+    List<List<_GridCell>> grid,
+    String word,
+  ) {
+    final directions = const <_CellPosition>[
+      _CellPosition(0, 1),
+      _CellPosition(0, -1),
+      _CellPosition(1, 0),
+      _CellPosition(-1, 0),
+      _CellPosition(1, 1),
+      _CellPosition(-1, -1),
+      _CellPosition(1, -1),
+      _CellPosition(-1, 1),
     ];
 
-    for (int attempt = 0; attempt < 250; attempt++) {
-      final direction = directions[_random.nextInt(directions.length)];
-      final startRow = _random.nextInt(gridSize);
-      final startCol = _random.nextInt(gridSize);
-
-      final endRow = startRow + direction.row * (word.length - 1);
-      final endCol = startCol + direction.col * (word.length - 1);
-
-      if (endRow < 0 || endRow >= gridSize || endCol < 0 || endCol >= gridSize) {
-        continue;
+    final size = grid.length;
+    final candidateStarts = <_CellPosition>[];
+    for (int row = 0; row < size; row++) {
+      for (int col = 0; col < size; col++) {
+        candidateStarts.add(_CellPosition(row, col));
       }
+    }
 
-      bool valid = true;
-      for (int index = 0; index < word.length; index++) {
-        final row = startRow + direction.row * index;
-        final col = startCol + direction.col * index;
-        final cell = grid[row][col];
-        final char = word[index];
+    candidateStarts.shuffle(_random);
+    for (final start in candidateStarts) {
+      for (final direction in directions) {
+        final endRow = start.row + direction.row * (word.length - 1);
+        final endCol = start.col + direction.col * (word.length - 1);
+        if (endRow < 0 || endRow >= size || endCol < 0 || endCol >= size) {
+          continue;
+        }
 
-        if (cell.letter != null && cell.letter != char) {
-          valid = false;
-          break;
+        final positions = <_CellPosition>[];
+        var valid = true;
+        for (int index = 0; index < word.length; index++) {
+          final row = start.row + direction.row * index;
+          final col = start.col + direction.col * index;
+          final cell = grid[row][col];
+          final character = word[index];
+
+          if (cell.letter != null && cell.letter != character) {
+            valid = false;
+            break;
+          }
+
+          positions.add(_CellPosition(row, col));
+        }
+
+        if (valid) {
+          return positions;
         }
       }
-
-      if (!valid) {
-        continue;
-      }
-
-      for (int index = 0; index < word.length; index++) {
-        final row = startRow + direction.row * index;
-        final col = startCol + direction.col * index;
-        grid[row][col].letter = word[index];
-      }
-
-      return true;
     }
 
-    return false;
+    return null;
   }
 
-  void _recalculateWordPositions() {
-    final newMap = <String, List<_CellPosition>>{};
-    for (final word in _targetWords) {
-      final positions = _findWordPositions(word);
-      if (positions.isNotEmpty) {
-        newMap[word] = positions;
-      }
-    }
-    _wordPositions = newMap;
-  }
-
-  List<_CellPosition> _findWordPositions(String word) {
+  List<_CellPosition> _findWordPositionsInGrid(
+    List<List<_GridCell>> grid,
+    String word,
+  ) {
     final directions = const <_CellPosition>[
       _CellPosition(0, 1),
       _CellPosition(0, -1),
@@ -425,28 +435,28 @@ class _WordHuntGameState extends State<WordHuntGame> {
       _CellPosition(-1, -1),
     ];
 
-    for (int row = 0; row < _grid.length; row++) {
-      for (int col = 0; col < _grid[row].length; col++) {
-        if ((_grid[row][col].letter ?? '').toUpperCase() != word[0]) {
+    for (int row = 0; row < grid.length; row++) {
+      for (int col = 0; col < grid.length; col++) {
+        if ((grid[row][col].letter ?? '').toUpperCase() != word[0]) {
           continue;
         }
 
         for (final direction in directions) {
           final positions = <_CellPosition>[];
-          bool valid = true;
+          var valid = true;
 
           for (int index = 0; index < word.length; index++) {
             final nextRow = row + direction.row * index;
             final nextCol = col + direction.col * index;
             if (nextRow < 0 ||
-                nextRow >= _grid.length ||
+                nextRow >= grid.length ||
                 nextCol < 0 ||
-                nextCol >= _grid.length) {
+                nextCol >= grid.length) {
               valid = false;
               break;
             }
 
-            final cellLetter = _grid[nextRow][nextCol].letter ?? '';
+            final cellLetter = grid[nextRow][nextCol].letter ?? '';
             if (cellLetter.toUpperCase() != word[index]) {
               valid = false;
               break;
@@ -464,6 +474,21 @@ class _WordHuntGameState extends State<WordHuntGame> {
     return const [];
   }
 
+  void _recalculateWordPositions() {
+    final newMap = <String, List<_CellPosition>>{};
+    for (final word in _targetWords) {
+      final positions = _findWordPositions(word);
+      if (positions.isNotEmpty) {
+        newMap[word] = positions;
+      }
+    }
+    _wordPositions = newMap;
+  }
+
+  List<_CellPosition> _findWordPositions(String word) {
+    return _findWordPositionsInGrid(_grid, word);
+  }
+
   int _scoreForWord(String word) => word.length * 10;
 
   bool _isPositionInsideGrid(_CellPosition position) {
@@ -471,11 +496,6 @@ class _WordHuntGameState extends State<WordHuntGame> {
         position.row < _grid.length &&
         position.col >= 0 &&
         position.col < _grid.length;
-  }
-
-  int _directionSign(int value) {
-    if (value == 0) return 0;
-    return value > 0 ? 1 : -1;
   }
 
   bool _canExtendSelection(_CellPosition candidate) {
@@ -505,8 +525,14 @@ class _WordHuntGameState extends State<WordHuntGame> {
     final candidateDeltaRow = candidate.row - last.row;
     final candidateDeltaCol = candidate.col - last.col;
 
-    final previousDirection = _directionVector(previousDeltaRow, previousDeltaCol);
-    final candidateDirection = _directionVector(candidateDeltaRow, candidateDeltaCol);
+    final previousDirection = _directionVector(
+      previousDeltaRow,
+      previousDeltaCol,
+    );
+    final candidateDirection = _directionVector(
+      candidateDeltaRow,
+      candidateDeltaCol,
+    );
 
     return previousDirection == candidateDirection;
   }
@@ -537,26 +563,17 @@ class _WordHuntGameState extends State<WordHuntGame> {
 
       if (_targetWords.contains(candidate)) {
         final wordPoints = _scoreForWord(candidate);
+        final positions =
+            _wordPositions[candidate] ??
+            _selectedPositions.map((p) => _CellPosition(p.row, p.col)).toList();
+
         setState(() {
           _foundWords.add(candidate);
+          _foundWordCells[candidate] = positions.toSet();
           _score += wordPoints;
           _selectedPositions.clear();
           _currentWord = '';
         });
-
-        final positions = _wordPositions[candidate] ??
-            _selectedPositions
-                .map((p) => _CellPosition(p.row, p.col))
-                .toList();
-
-        for (final position in positions) {
-          if (_isPositionInsideGrid(position)) {
-            _grid[position.row][position.col].letter = null;
-          }
-        }
-
-        _applyGravityAndRefill();
-        _recalculateWordPositions();
 
         if (!_sessionLogged) {
           DataService.addGamePlayed();
@@ -568,7 +585,6 @@ class _WordHuntGameState extends State<WordHuntGame> {
         } else {
           _showFeedback('✓ $candidate', Colors.green.shade700);
         }
-        setState(() {});
         return;
       }
     }
@@ -577,27 +593,6 @@ class _WordHuntGameState extends State<WordHuntGame> {
       _clearSelection();
     });
     _showFeedback('✕ Try again', Colors.red);
-  }
-
-  void _applyGravityAndRefill() {
-    final size = _grid.length;
-    for (int col = 0; col < size; col++) {
-      final columnLetters = <String>[];
-      for (int row = size - 1; row >= 0; row--) {
-        final letter = _grid[row][col].letter;
-        if (letter != null && letter.trim().isNotEmpty) {
-          columnLetters.add(letter);
-        }
-      }
-
-      for (int row = size - 1; row >= 0; row--) {
-        if (columnLetters.isNotEmpty) {
-          _grid[row][col].letter = columnLetters.removeAt(0);
-        } else {
-          _grid[row][col].letter = _randomLetter();
-        }
-      }
-    }
   }
 
   void _showFeedback(String message, Color color) {
@@ -731,11 +726,15 @@ class _WordHuntGameState extends State<WordHuntGame> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor ??
+        backgroundColor:
+            Theme.of(context).appBarTheme.backgroundColor ??
             Theme.of(context).colorScheme.surface,
         elevation: 0,
         leading: const BackButton(),
-        title: const Text('Word Hunt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+        title: const Text(
+          'Word Hunt',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+        ),
         centerTitle: true,
       ),
       body: _invalidModule
@@ -753,205 +752,249 @@ class _WordHuntGameState extends State<WordHuntGame> {
               ),
             )
           : DataService.modules.isEmpty
-              ? Center(
-                  child: Text(
-                    'No modules uploaded yet.\nAsk your teacher to upload one.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ? Center(
+              child: Text(
+                'No modules uploaded yet.\nAsk your teacher to upload one.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final gridSize = _grid.length;
+                final safeWidth = constraints.maxWidth - 32;
+                final cellSize = (safeWidth / gridSize).clamp(26.0, 52.0);
+                final boardSize = cellSize * gridSize;
+
+                return SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                  ),
-                )
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final gridSize = _grid.length;
-                    final safeWidth = constraints.maxWidth - 32;
-                    final cellSize = (safeWidth / gridSize).clamp(26.0, 52.0);
-                    final boardSize = cellSize * gridSize;
-
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 8),
-                          Text(
-                            'Level $_currentLevel',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
+                        Text(
+                          'Level $_currentLevel',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _infoCard('Score', '$_score', context),
-                              const SizedBox(width: 8),
-                              _infoCard('Time', _formattedTime, context),
-                              const SizedBox(width: 8),
-                              _infoCard('Words', '${_foundWords.length}/${_targetWords.length}', context),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _infoCard('Score', '$_score', context),
+                            const SizedBox(width: 8),
+                            _infoCard('Time', _formattedTime, context),
+                            const SizedBox(width: 8),
+                            _infoCard(
+                              'Words',
+                              '${_foundWords.length}/${_targetWords.length}',
+                              context,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(
+                                  context,
+                                ).shadowColor.withOpacity(0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Theme.of(context).shadowColor.withOpacity(0.08),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            child: Center(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onPanStart: (details) {
-                                  final cell = _cellFromLocalPosition(
-                                    details.localPosition,
-                                    cellSize,
-                                  );
-                                  if (cell != null) {
-                                    _beginSelection(cell);
-                                  }
-                                },
-                                onPanUpdate: (details) {
-                                  final cell = _cellFromLocalPosition(
-                                    details.localPosition,
-                                    cellSize,
-                                  );
-                                  if (cell != null) {
-                                    _updateSelection(cell);
-                                  }
-                                },
-                                onPanEnd: (_) => _handleSelectionEnd(),
-                                onPanCancel: () => _handleSelectionEnd(),
-                                child: SizedBox(
-                                  width: boardSize,
-                                  height: boardSize,
-                                  child: GridView.builder(
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: gridSize,
-                                      crossAxisSpacing: 3,
-                                      mainAxisSpacing: 3,
-                                      childAspectRatio: 1,
-                                    ),
-                                    itemCount: gridSize * gridSize,
-                                    itemBuilder: (context, index) {
-                                      final row = index ~/ gridSize;
-                                      final col = index % gridSize;
-                                      final cell = _grid[row][col];
-                                      final key = _CellPosition(row, col);
-                                      final isSelected = _selectedPositions.contains(key);
+                          padding: const EdgeInsets.all(8),
+                          child: Center(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onPanStart: (details) {
+                                final cell = _cellFromLocalPosition(
+                                  details.localPosition,
+                                  cellSize,
+                                );
+                                if (cell != null) {
+                                  _beginSelection(cell);
+                                }
+                              },
+                              onPanUpdate: (details) {
+                                final cell = _cellFromLocalPosition(
+                                  details.localPosition,
+                                  cellSize,
+                                );
+                                if (cell != null) {
+                                  _updateSelection(cell);
+                                }
+                              },
+                              onPanEnd: (_) => _handleSelectionEnd(),
+                              onPanCancel: () => _handleSelectionEnd(),
+                              child: SizedBox(
+                                width: boardSize,
+                                height: boardSize,
+                                child: GridView.builder(
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: gridSize,
+                                        crossAxisSpacing: 3,
+                                        mainAxisSpacing: 3,
+                                        childAspectRatio: 1,
+                                      ),
+                                  itemCount: gridSize * gridSize,
+                                  itemBuilder: (context, index) {
+                                    final row = index ~/ gridSize;
+                                    final col = index % gridSize;
+                                    final cell = _grid[row][col];
+                                    final key = _CellPosition(row, col);
+                                    final isSelected = _selectedPositions
+                                        .contains(key);
+                                    final foundCount = _foundWordCells.values
+                                        .where(
+                                          (positions) =>
+                                              positions.contains(key),
+                                        )
+                                        .length;
 
-                                      return AnimatedContainer(
-                                        duration: const Duration(milliseconds: 120),
-                                        decoration: BoxDecoration(
+                                    final cellColor = isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                              .withOpacity(0.18)
+                                        : foundCount > 0
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.primary.withOpacity(
+                                            0.18 + (foundCount * 0.12),
+                                          )
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.surfaceContainerHighest;
+
+                                    return AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 120,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: cellColor,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
                                           color: isSelected
-                                              ? Theme.of(context).colorScheme.primary.withOpacity(0.18)
-                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(
-                                            color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
-                                            width: isSelected ? 1.5 : 1,
-                                          ),
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : foundCount > 0
+                                              ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withOpacity(0.7)
+                                              : Theme.of(context).dividerColor,
+                                          width: isSelected || foundCount > 0
+                                              ? 1.5
+                                              : 1,
                                         ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          cell.letter ?? '',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).colorScheme.onSurface,
-                                          ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        cell.letter ?? '',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                         ),
-                                      );
-                                    },
-                                  ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          if (_currentWord.isNotEmpty)
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  _currentWord,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 3,
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                  ),
-                                ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_currentWord.isNotEmpty)
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
                               ),
-                            ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              OutlinedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _clearSelection();
-                                  });
-                                },
-                                child: const Text('Clear'),
-                              ),
-                              const SizedBox(width: 12),
-                              ElevatedButton(
-                                onPressed: _handleSelectionEnd,
-                                child: const Text('Check Word'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Words to find',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          ..._targetWords.map((word) {
-                            final found = _foundWords.contains(word);
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                               decoration: BoxDecoration(
-                                color: found
-                                    ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.35)
-                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(10),
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                word,
+                                _currentWord,
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: found ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
-                                  decoration: found ? TextDecoration.lineThrough : null,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 3,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                               ),
-                            );
-                          }),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                            ),
+                          ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Words to find',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ..._targetWords.map((word) {
+                          final found = _foundWords.contains(word);
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: found
+                                  ? Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                        .withOpacity(0.35)
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              word,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: found
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface,
+                                decoration: found
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 

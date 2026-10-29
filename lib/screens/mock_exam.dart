@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/data_service.dart';
+import '../services/performance_service.dart';
 import '../models/module_model.dart';
 
 class MockExam extends StatefulWidget {
@@ -16,6 +18,7 @@ class _MockExamState extends State<MockExam> {
   bool _answered = false;
   List<Question> _questions = [];
   bool _finished = false;
+  bool _resultSaved = false;
 
   @override
   void initState() {
@@ -37,6 +40,7 @@ class _MockExamState extends State<MockExam> {
       _selectedAnswer = null;
       _answered = false;
       _finished = false;
+      _resultSaved = false;
       _loadQuestions();
     });
   }
@@ -70,7 +74,10 @@ class _MockExamState extends State<MockExam> {
 
   void _next() {
     if (_currentIndex + 1 >= _questions.length) {
-      setState(() => _finished = true);
+      setState(() {
+        _finished = true;
+        _resultSaved = false;
+      });
       return;
     }
     setState(() {
@@ -223,6 +230,18 @@ class _MockExamState extends State<MockExam> {
   }
 
   Widget _buildResults(ThemeData theme) {
+    if (!_resultSaved) {
+      _resultSaved = true;
+      DataService.addExamTaken();
+      final moduleTitle = _questions.isNotEmpty ? DataService.modules.isNotEmpty ? DataService.modules.last.title : 'General' : 'General';
+      unawaited(PerformanceService.recordAssessmentResult(
+        type: 'mock_exam',
+        score: _score,
+        total: _questions.length,
+        subject: moduleTitle,
+        moduleTitle: moduleTitle,
+      ));
+    }
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

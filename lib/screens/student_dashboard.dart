@@ -1,19 +1,23 @@
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import '../models/module_model.dart';
 import '../services/auth_service.dart';
 import '../services/data_service.dart';
-import '../models/module_model.dart';
+import '../services/performance_service.dart';
+import 'about_us.dart';
 import 'account_settings.dart';
 import 'flashcards.dart';
+import 'help_page.dart';
 import 'join_class_screen.dart';
 import 'mock_exam.dart';
-import 'module_viewer.dart';
 import 'module_library.dart';
 import 'quiz.dart';
+import 'statistics_history_page.dart';
 import 'system_settings.dart';
-import 'about_us.dart';
 import 'word_hunt_game.dart';
-import 'dart:async';
 
 class StudentHome extends StatefulWidget {
   const StudentHome({super.key});
@@ -93,8 +97,24 @@ class _StudentHomeState extends State<StudentHome> {
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const HelpPage(isTeacher: false),
+              ),
+            ),
+            icon: const Icon(Icons.help_outline, size: 18),
+            label: const Text('Help'),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Log out',
             onPressed: () => _showLogoutDialog(context),
           ),
         ],
@@ -119,34 +139,74 @@ class _StudentHomeState extends State<StudentHome> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text(
-                    'Student Dashboard',
-                    style:
-                        theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ) ??
-                        TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 20,
                         ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Continue your learning journey',
-                    style:
-                        theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ) ??
-                        TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFFEAF7FF,
+                          ).withValues(alpha: 0.96),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Colors.lightBlue.shade200,
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withValues(alpha: 0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Student Dashboard',
+                              textAlign: TextAlign.center,
+                              style:
+                                  theme.textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ) ??
+                                  TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Continue Your Learning Journey',
+                              textAlign: TextAlign.center,
+                              softWrap: true,
+                              style:
+                                  theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ) ??
+                                  TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Stats Row ──────────────────────────────────────
-                  _buildStatsRow(theme),
+                  // ── Performance Pie Chart ──────────────────────────
+                  // ── Subject Performance ───────────────────────────
+                  _buildSubjectPerformanceCard(theme),
                   const SizedBox(height: 24),
 
-                  // ── Performance Pie Chart ──────────────────────────
                   _buildPerformanceChart(theme),
                   const SizedBox(height: 24),
 
@@ -389,133 +449,263 @@ class _StudentHomeState extends State<StudentHome> {
   }
 
   // ── Stats Row ──────────────────────────────────────────────────
-  Widget _buildStatsRow(ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: _MiniStatCard(
-            label: 'Quizzes',
-            value: DataService.quizzesTaken.toString(),
-            icon: Icons.quiz,
-            color: Colors.blue,
+  Widget _buildSubjectPerformanceCard(ThemeData theme) {
+    return FutureBuilder<StudentPerformanceSummary?>(
+      future: PerformanceService.loadLatestSummary(
+        uid: AuthService.currentUser?.id,
+      ),
+      builder: (context, snapshot) {
+        final summary = snapshot.data;
+        final subjects = summary?.subjects ?? const <SubjectPerformance>[];
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withValues(alpha: 0.08),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          );
+        }
+
+        if (subjects.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              'Complete quizzes or mock exams to see your subject performance.',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: theme.shadowColor.withValues(alpha: 0.08),
+                blurRadius: 6,
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MiniStatCard(
-            label: 'Games',
-            value: DataService.gamesPlayed.toString(),
-            icon: Icons.games,
-            color: Colors.green,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Subject Performance',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.bar_chart, color: theme.colorScheme.primary),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (summary?.bestSubject != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Best: ${summary!.bestSubject} (${summary.bestAverage!.toStringAsFixed(1)}%)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ...subjects.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.subject,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${item.averagePercent.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: (item.averagePercent / 100).clamp(0.0, 1.0),
+                          minHeight: 10,
+                          backgroundColor: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.08),
+                          valueColor: const AlwaysStoppedAnimation(
+                            Colors.lightBlueAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MiniStatCard(
-            label: 'Exams',
-            value: DataService.examsTaken.toString(),
-            icon: Icons.assignment,
-            color: Colors.purple,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MiniStatCard(
-            label: 'Study',
-            value: DataService.studyTimeFormatted,
-            icon: Icons.timer,
-            color: Colors.orange,
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
   // ── Performance Chart ──────────────────────────────────────────
   Widget _buildPerformanceChart(ThemeData theme) {
-    final total =
-        DataService.quizzesTaken +
-        DataService.examsTaken +
-        DataService.gamesPlayed;
+    return FutureBuilder<StudentActivityCounts>(
+      future: PerformanceService.loadStudentActivityCounts(
+        uid: AuthService.currentUser?.id,
+      ),
+      builder: (context, snapshot) {
+        final counts = snapshot.data ?? StudentActivityCounts.empty;
+        final total = counts.total;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 6),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Activity Overview',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: theme.colorScheme.onSurface,
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
             ),
+            child: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: theme.shadowColor.withOpacity(0.08),
+                blurRadius: 6,
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          total == 0
-              ? Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.bar_chart,
-                        size: 48,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No activity data yet',
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        'Complete quizzes, exams, and games to see stats',
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    // Simple bar chart using progress indicators
-                    _ActivityBar(
-                      label: 'Quizzes',
-                      value: DataService.quizzesTaken,
-                      total: total,
-                      color: Colors.blue,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _ActivityBar(
-                      label: 'Mock Exams',
-                      value: DataService.examsTaken,
-                      total: total,
-                      color: Colors.purple,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _ActivityBar(
-                      label: 'Games',
-                      value: DataService.gamesPlayed,
-                      total: total,
-                      color: Colors.green,
-                      theme: theme,
-                    ),
-                  ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Activity Overview',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: theme.colorScheme.onSurface,
                 ),
-        ],
-      ),
+              ),
+              const SizedBox(height: 16),
+              total == 0
+                  ? Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.bar_chart,
+                            size: 48,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No activity data yet',
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            'Complete quizzes, exams, and games to see stats',
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        _ActivityBar(
+                          label: 'Quizzes',
+                          value: counts.quizzes,
+                          total: total,
+                          color: Colors.blue,
+                          theme: theme,
+                        ),
+                        const SizedBox(height: 8),
+                        _ActivityBar(
+                          label: 'Mock Exams',
+                          value: counts.mockExams,
+                          total: total,
+                          color: Colors.purple,
+                          theme: theme,
+                        ),
+                        const SizedBox(height: 8),
+                        _ActivityBar(
+                          label: 'Games',
+                          value: counts.games,
+                          total: total,
+                          color: Colors.green,
+                          theme: theme,
+                        ),
+                      ],
+                    ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -571,6 +761,21 @@ class _StudentHomeState extends State<StudentHome> {
             ),
             const SizedBox(height: 24),
 
+            _DrawerTile(
+              icon: Icons.analytics_outlined,
+              title: 'Statistics History',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const StatisticsHistoryPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+
             // System Settings
             _DrawerTile(
               icon: Icons.settings_outlined,
@@ -617,61 +822,6 @@ class _StudentHomeState extends State<StudentHome> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Mini Stat Card ─────────────────────────────────────────────────
-class _MiniStatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _MiniStatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 4),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: theme.colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 10,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ),
     );
   }
@@ -750,48 +900,66 @@ class _FeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.18),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 32),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.25),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 32),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white70,
-                size: 16,
-              ),
-            ],
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white70,
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
       ),

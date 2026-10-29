@@ -38,18 +38,6 @@ class AboutUsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _sectionCard(
-                  title: 'How to Use FiBER',
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < aboutSteps.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 12),
-                        _StepTile(number: i + 1, step: aboutSteps[i]),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _sectionCard(
                   title: 'Meet the Team',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -199,66 +187,6 @@ class _SubHeading extends StatelessWidget {
         fontWeight: FontWeight.w700,
         color: _brand,
         letterSpacing: 0.5,
-      ),
-    );
-  }
-}
-
-class _StepTile extends StatelessWidget {
-  const _StepTile({required this.number, required this.step});
-
-  final int number;
-  final AboutStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F8FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.lightBlue.shade100),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: _brand,
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  step.title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  step.body,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: _ink,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

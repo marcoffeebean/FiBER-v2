@@ -15,9 +15,28 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _usernameCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
-  final TextEditingController _confirmPasswordCtrl =
-      TextEditingController();
+  final TextEditingController _confirmPasswordCtrl = TextEditingController();
   bool _isLoading = false;
+
+  void _showRegistrationHelp() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Registration Help'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Sign up using your CvSU email address or log in if you already have an account. For teachers, the admin or department chairperson will provide an account to access the Teacher Dashboard for managing learning materials and monitoring student progress.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -65,8 +84,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: Padding(
                     padding: const EdgeInsets.only(left: 8, top: 4),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new,
-                          color: Colors.lightBlueAccent),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.lightBlueAccent,
+                      ),
                       onPressed: () =>
                           Navigator.pushReplacementNamed(context, '/'),
                       tooltip: 'Back to Home',
@@ -104,6 +125,19 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: _showRegistrationHelp,
+                tooltip: 'Registration help',
+                icon: const Icon(
+                  Icons.help_outline,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
             Text(
               'Join FiBER',
               style: GoogleFonts.playfairDisplay(
@@ -120,8 +154,7 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 16),
             _buildTextField(controller: _nameCtrl, label: 'Full Name'),
             const SizedBox(height: 16),
-            _buildTextField(
-                controller: _usernameCtrl, label: 'Username'),
+            _buildTextField(controller: _usernameCtrl, label: 'Username'),
             const SizedBox(height: 16),
             _buildTextField(controller: _emailCtrl, label: 'Email'),
             const SizedBox(height: 16),
@@ -164,8 +197,7 @@ class _SignupScreenState extends State<SignupScreen> {
         hintText: hint,
         hintStyle: const TextStyle(color: Colors.white38),
         labelStyle: const TextStyle(color: Colors.white70),
-        floatingLabelStyle:
-            const TextStyle(color: Colors.lightBlueAccent),
+        floatingLabelStyle: const TextStyle(color: Colors.lightBlueAccent),
         filled: true,
         fillColor: const Color.fromRGBO(255, 255, 255, 0.08),
         border: OutlineInputBorder(
@@ -194,13 +226,13 @@ class _SignupScreenState extends State<SignupScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.lightBlueAccent,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24)),
+            borderRadius: BorderRadius.circular(24),
+          ),
         ),
         onPressed: _submit,
         child: const Text(
           'Create Account',
-          style: TextStyle(
-              fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
     );
@@ -210,12 +242,16 @@ class _SignupScreenState extends State<SignupScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text('Already have an account?',
-            style: TextStyle(color: Colors.white70)),
+        const Text(
+          'Already have an account?',
+          style: TextStyle(color: Colors.white70),
+        ),
         TextButton(
           onPressed: () => Navigator.pushNamed(context, '/login'),
-          child: const Text('Login here',
-              style: TextStyle(color: Colors.lightBlueAccent)),
+          child: const Text(
+            'Login here',
+            style: TextStyle(color: Colors.lightBlueAccent),
+          ),
         ),
       ],
     );

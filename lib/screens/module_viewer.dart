@@ -13,9 +13,25 @@ class ModuleViewer extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
-          child: Text(
-            module.content,
-            style: const TextStyle(fontSize: 16, height: 1.6),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.lightBlue.shade100),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              module.content,
+              style: const TextStyle(fontSize: 16, height: 1.6),
+            ),
           ),
         ),
       ),

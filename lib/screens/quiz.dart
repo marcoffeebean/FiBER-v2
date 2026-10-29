@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/data_service.dart';
+import '../services/performance_service.dart';
 import '../models/module_model.dart';
 
 class MiniQuiz extends StatefulWidget {
@@ -16,6 +18,7 @@ class _MiniQuizState extends State<MiniQuiz> {
   bool _answered = false;
   List<Question> _questions = [];
   bool _finished = false;
+  bool _resultSaved = false;
 
   @override
   void initState() {
@@ -37,6 +40,7 @@ class _MiniQuizState extends State<MiniQuiz> {
       _selectedAnswer = null;
       _answered = false;
       _finished = false;
+      _resultSaved = false;
       _loadQuestions();
     });
   }
@@ -70,7 +74,10 @@ class _MiniQuizState extends State<MiniQuiz> {
 
   void _next() {
     if (_currentIndex + 1 >= _questions.length) {
-      setState(() => _finished = true);
+      setState(() {
+        _finished = true;
+        _resultSaved = false;
+      });
       return;
     }
     setState(() {
@@ -97,12 +104,16 @@ class _MiniQuizState extends State<MiniQuiz> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+        backgroundColor:
+            theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
         leading: BackButton(color: theme.colorScheme.onSurface),
         title: Text(
           'Mini Quiz',
-          style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
       ),
@@ -168,7 +179,8 @@ class _MiniQuizState extends State<MiniQuiz> {
             Color bgColor = theme.colorScheme.surface;
             if (_answered) {
               if (i == q.correctIndex) bgColor = Colors.green.shade100;
-              if (i == _selectedAnswer && i != q.correctIndex) bgColor = Colors.red.shade100;
+              if (i == _selectedAnswer && i != q.correctIndex)
+                bgColor = Colors.red.shade100;
             }
             return GestureDetector(
               onTap: () => _selectAnswer(i),
@@ -221,9 +233,26 @@ class _MiniQuizState extends State<MiniQuiz> {
   }
 
   Widget _buildResults(ThemeData theme) {
-    setState(() {
+    if (!_resultSaved) {
+      _resultSaved = true;
       DataService.addQuizTaken();
-    });
+      final moduleTitle = _questions.isNotEmpty
+          ? _questions.first.question.isNotEmpty
+                ? DataService.modules.isNotEmpty
+                      ? DataService.modules.last.title
+                      : 'General'
+                : 'General'
+          : 'General';
+      unawaited(
+        PerformanceService.recordAssessmentResult(
+          type: 'quiz',
+          score: _score,
+          total: _questions.length,
+          subject: moduleTitle,
+          moduleTitle: moduleTitle,
+        ),
+      );
+    }
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -241,7 +270,10 @@ class _MiniQuizState extends State<MiniQuiz> {
           const SizedBox(height: 8),
           Text(
             'Score: $_score / ${_questions.length}',
-            style: TextStyle(fontSize: 20, color: theme.colorScheme.onSurfaceVariant),
+            style: TextStyle(
+              fontSize: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(

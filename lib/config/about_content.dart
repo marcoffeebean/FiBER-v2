@@ -16,13 +16,6 @@ class AboutPerson {
   final String? photoAsset;
 }
 
-class AboutStep {
-  const AboutStep({required this.title, required this.body});
-
-  final String title;
-  final String body;
-}
-
 const aboutPurposeText =
     'FiBER aims to make Fisheries Board Exam preparation more accessible, '
     'interactive, and effective through learning modules, mock examinations, '
@@ -33,38 +26,6 @@ const aboutPurposeText =
     'an educational and technological initiative of CvSU-Naic, FiBER also '
     'supports innovative fisheries education and serves as a foundation for '
     'future technology-driven academic projects.';
-
-const aboutSteps = <AboutStep>[
-  AboutStep(
-    title: 'Create an Account or Log In',
-    body:
-        'Sign up using your CvSU email address or log in if you already have an '
-        'account. For teachers, the admin or department chairperson will provide '
-        'an account to access the Teacher Dashboard for managing learning '
-        'materials and monitoring student progress.',
-  ),
-  AboutStep(
-    title: 'Explore Learning Features',
-    body:
-        'For students, explore the learning modules, take mini quizzes and mock '
-        'exams, and track your performance analytics to identify areas for '
-        'improvement. For teachers, upload and manage learning materials, create '
-        'quizzes and exams, and monitor student progress through your classes.',
-  ),
-  AboutStep(
-    title: 'Join or Create a Class',
-    body:
-        'For students, join your teacher\'s class by entering the class code '
-        'provided by your teacher. For teachers, create a class and share the '
-        'class code with students so they can join.',
-  ),
-  AboutStep(
-    title: 'Take a Study Break',
-    body:
-        'For a short study break, play the available mini games to relax and '
-        'refresh your mind.',
-  ),
-];
 
 const aboutDevelopers = <AboutPerson>[
   AboutPerson(name: 'Ymanuel Marco T. Manalo'),

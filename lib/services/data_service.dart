@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import 'package:archive/archive.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:docx_to_text/docx_to_text.dart';
@@ -58,6 +60,32 @@ class DataService {
 
   static void setFontSize(double size) {
     fontSizeNotifier.value = size;
+  }
+
+  static String encodeAlumniImage(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      throw Exception('This file is not a supported image.');
+    }
+
+    img.Image resized = decoded;
+    final longest = max(decoded.width, decoded.height);
+    if (longest > 256) {
+      final scale = 256 / longest;
+      resized = img.copyResize(
+        decoded,
+        width: (decoded.width * scale).round(),
+        height: (decoded.height * scale).round(),
+      );
+    }
+
+    final jpg = img.encodeJpg(resized, quality: 80);
+    if (jpg.length > 300 * 1024) {
+      throw Exception(
+        'Image is still too large after compression. Try a smaller photo.',
+      );
+    }
+    return 'data:image/jpeg;base64,${base64Encode(jpg)}';
   }
 
   // ── Study Timer ────────────────────────────────────────────────
@@ -693,49 +721,9 @@ class DataService {
         ..addAll(profiles);
 
       return List.unmodifiable([..._alumniProfiles]);
-    } catch (_) {
-      _alumniProfiles
-        ..clear()
-        ..addAll(_seedAlumniProfiles());
-      return List.unmodifiable([..._alumniProfiles]);
-    }
-  }
-
-  static Future<void> saveAlumniProfile(AlumniProfile profile) async {
-    try {
-      final now = DateTime.now();
-      final data = profile.toMap();
-      final payload = {...data, 'updatedAt': now.toIso8601String()};
-
-      final docId = profile.id.trim();
-      if (docId.isEmpty) {
-        final ref = await _firestore.collection('alumni_profiles').add(payload);
-        _alumniProfiles.add(
-          profile.copyWith(
-            id: ref.id,
-            updatedAt: now,
-            createdAt: profile.createdAt,
-          ),
-        );
-      } else {
-        await _firestore
-            .collection('alumni_profiles')
-            .doc(docId)
-            .set(payload, SetOptions(merge: true));
-
-        final index = _alumniProfiles.indexWhere((item) => item.id == docId);
-        if (index >= 0) {
-          _alumniProfiles[index] = profile.copyWith(updatedAt: now);
-        } else {
-          _alumniProfiles.add(profile.copyWith(updatedAt: now));
-        }
-      }
-      notifyModuleUpdated();
-    } catch (_) {
-      if (!_alumniProfiles.any((item) => item.id == profile.id)) {
-        _alumniProfiles.add(profile);
-      }
-      notifyModuleUpdated();
+    } catch (e) {
+      debugPrint('Loading alumni profiles failed: $e');
+      return List.unmodifiable(_alumniProfiles);
     }
   }
 
@@ -748,17 +736,29 @@ class DataService {
     notifyModuleUpdated();
   }
 
-  static Future<String> uploadAlumniImage(
-    String fileName,
-    Uint8List bytes,
-  ) async {
-    try {
-      final storageRef = _storage.ref().child('alumni_profiles/$fileName');
-      final uploadTask = await storageRef.putData(bytes);
-      return await uploadTask.ref.getDownloadURL();
-    } catch (_) {
-      return '';
+  static Future<void> saveAlumniProfile(AlumniProfile profile) async {
+    final now = DateTime.now();
+    final payload = {...profile.toMap(), 'updatedAt': now.toIso8601String()};
+    final docId = profile.id.trim();
+
+    if (docId.isEmpty) {
+      final ref = await _firestore.collection('alumni_profiles').add(payload);
+      _alumniProfiles.add(profile.copyWith(id: ref.id, updatedAt: now));
+    } else {
+      await _firestore
+          .collection('alumni_profiles')
+          .doc(docId)
+          .set(payload, SetOptions(merge: true));
+
+      final updated = profile.copyWith(updatedAt: now);
+      final index = _alumniProfiles.indexWhere((item) => item.id == docId);
+      if (index >= 0) {
+        _alumniProfiles[index] = updated;
+      } else {
+        _alumniProfiles.add(updated);
+      }
     }
+    notifyModuleUpdated();
   }
 
   static List<AlumniProfile> _seedAlumniProfiles() {

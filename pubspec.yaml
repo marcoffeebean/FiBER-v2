@@ -41,6 +41,7 @@ dependencies:
   docx_to_text: ^1.0.1
   archive: ^3.6.1
   image_picker: ^1.1.2
+  image: ^4.3.0
  
  
 dev_dependencies:

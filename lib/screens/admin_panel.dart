@@ -1,8 +1,10 @@
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../models/alumni_model.dart';
 import '../services/auth_service.dart';
 import '../services/data_service.dart';
+import '../widgets/alumni_avatar.dart';
 import 'account_settings.dart';
 import 'system_settings.dart';
 import 'about_us.dart';
@@ -364,157 +366,253 @@ class _AdminPanelState extends State<AdminPanel> {
     final salaryCtrl = TextEditingController(text: profile?.salary ?? '');
     final highlightCtrl = TextEditingController(text: profile?.highlight ?? '');
     final orderCtrl = TextEditingController(
-      text: (profile?.displayOrder ?? DataService.alumniProfiles.length + 1).toString(),
+      text: (profile?.displayOrder ?? DataService.alumniProfiles.length + 1)
+          .toString(),
     );
-    String imageUrl = profile?.imageUrl ?? '';
+
+    String imageUrl = profile?.imageUrl ?? ''; // existing saved image
+    Uint8List? pickedBytes; // new image, not uploaded yet
+    String? pickedName;
     bool isVisible = profile?.isVisible ?? true;
     bool isSaving = false;
     final formKey = GlobalKey<FormState>();
 
-    final pickedFile = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
-    );
-    if (pickedFile != null && pickedFile.files.isNotEmpty) {
-      final file = pickedFile.files.first;
-      if (file.bytes != null) {
-        final uploadedUrl = await DataService.uploadAlumniImage(
-          file.name,
-          file.bytes!,
-        );
-        if (uploadedUrl.isNotEmpty) {
-          imageUrl = uploadedUrl;
-        }
-      }
-    }
-
-    if (!mounted) return;
+    const maxBytes = 5 * 1024 * 1024;
 
     await showDialog(
       context: context,
+      barrierDismissible: !isSaving,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(isEditing ? 'Edit Alumni Profile' : 'Add Alumni Profile'),
-          content: SizedBox(
-            width: 480,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Name'),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'Job Title'),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: companyCtrl,
-                      decoration: const InputDecoration(labelText: 'Company'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: batchCtrl,
-                      decoration: const InputDecoration(labelText: 'Batch Year'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: salaryCtrl,
-                      decoration: const InputDecoration(labelText: 'Salary'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: highlightCtrl,
-                      maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Highlight'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: orderCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Display Order'),
-                    ),
-                    const SizedBox(height: 12),
-                    SwitchListTile(
-                      value: isVisible,
-                      onChanged: (value) => setDialogState(() => isVisible = value),
-                      title: const Text('Visible on front page'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(height: 8),
-                    if (imageUrl.isNotEmpty)
-                      SizedBox(
-                        height: 90,
-                        child: Center(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.network(
-                              imageUrl,
-                              height: 80,
-                              width: 80,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+        builder: (dialogContext, setDialogState) {
+          Future<void> pickImage() async {
+            final result = await FilePicker.platform.pickFiles(
+              type: FileType.image,
+              allowMultiple: false,
+              withData: true, // required on Android/iOS to get bytes
+            );
+            if (result == null || result.files.isEmpty)
+              return; // canceled: keep current image
+
+            final file = result.files.first;
+            if (file.bytes == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not read the selected image.'),
+                ),
+              );
+              return;
+            }
+            if (file.bytes!.lengthInBytes > maxBytes) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Image must be 5 MB or smaller.')),
+              );
+              return;
+            }
+            setDialogState(() {
+              pickedBytes = file.bytes;
+              pickedName = file.name;
+            });
+          }
+
+          Future<void> save() async {
+            if (!formKey.currentState!.validate()) return;
+            setDialogState(() => isSaving = true);
+
+            try {
+              var finalImageUrl = imageUrl;
+              if (pickedBytes != null) {
+                finalImageUrl = DataService.encodeAlumniImage(pickedBytes!);
+              }
+
+              final finalProfile = AlumniProfile(
+                id:
+                    profile?.id ??
+                    DateTime.now().millisecondsSinceEpoch.toString(),
+                name: nameCtrl.text.trim(),
+                title: titleCtrl.text.trim(),
+                company: companyCtrl.text.trim(),
+                batchYear: batchCtrl.text.trim(),
+                salary: salaryCtrl.text.trim(),
+                imageUrl: finalImageUrl,
+                highlight: highlightCtrl.text.trim(),
+                isVisible: isVisible,
+                displayOrder: int.tryParse(orderCtrl.text.trim()) ?? 0,
+                createdAt: profile?.createdAt ?? DateTime.now(),
+                updatedAt: DateTime.now(),
+              );
+
+              await DataService.saveAlumniProfile(finalProfile);
+
+              if (!mounted) return;
+              setState(() {});
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isEditing
+                        ? 'Alumni profile updated.'
+                        : 'Alumni profile added.',
+                  ),
+                ),
+              );
+            } catch (e) {
+              debugPrint('Alumni save failed: $e');
+              setDialogState(() => isSaving = false);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Save failed. Please try again. ($e)')),
+              );
+            }
+          }
+
+          Widget imagePreview() {
+            const size = 96.0;
+            if (pickedBytes != null) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.memory(
+                  pickedBytes!,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                ),
+              );
+            }
+            if (imageUrl.isNotEmpty) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  imageUrl,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _placeholder(size),
+                ),
+              );
+            }
+            return _placeholder(size);
+          }
+
+          return AlertDialog(
+            title: Text(
+              isEditing ? 'Edit Alumni Profile' : 'Add Alumni Profile',
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Center(child: imagePreview()),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: isSaving ? null : pickImage,
+                        icon: const Icon(Icons.add_a_photo),
+                        label: Text(
+                          (pickedBytes != null || imageUrl.isNotEmpty)
+                              ? 'Replace Image'
+                              : 'Upload Image',
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Required'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Job Title',
+                        ),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Required'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: companyCtrl,
+                        decoration: const InputDecoration(labelText: 'Company'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: batchCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Batch Year',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: salaryCtrl,
+                        decoration: const InputDecoration(labelText: 'Salary'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: highlightCtrl,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Highlight',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: orderCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Display Order',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        value: isVisible,
+                        onChanged: (value) =>
+                            setDialogState(() => isVisible = value),
+                        title: const Text('Visible on front page'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      if (!formKey.currentState!.validate()) return;
-                      setDialogState(() => isSaving = true);
-
-                      final finalProfile = AlumniProfile(
-                        id: profile?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        name: nameCtrl.text.trim(),
-                        title: titleCtrl.text.trim(),
-                        company: companyCtrl.text.trim(),
-                        batchYear: batchCtrl.text.trim(),
-                        salary: salaryCtrl.text.trim(),
-                        imageUrl: imageUrl,
-                        highlight: highlightCtrl.text.trim(),
-                        isVisible: isVisible,
-                        displayOrder: int.tryParse(orderCtrl.text.trim()) ?? 0,
-                        createdAt: profile?.createdAt ?? DateTime.now(),
-                        updatedAt: DateTime.now(),
-                      );
-
-                      await DataService.saveAlumniProfile(finalProfile);
-                      if (!mounted) return;
-                      setState(() {});
-                      Navigator.pop(dialogContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isEditing ? 'Alumni profile updated.' : 'Alumni profile added.',
-                          ),
-                        ),
-                      );
-                    },
-              child: isSaving ? const Text('Saving...') : const Text('Save'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSaving ? null : save,
+                child: isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _placeholder(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3F2FD), // light blue, adjust to your theme
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Icon(Icons.person, size: 48, color: Color(0xFF1976D2)),
     );
   }
 
@@ -674,9 +772,7 @@ class _AdminPanelState extends State<AdminPanel> {
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
-          color: Colors.lightBlue.shade50,
-        ),
+        decoration: BoxDecoration(color: Colors.lightBlue.shade50),
         child: Stack(
           children: [
             Positioned.fill(
@@ -694,8 +790,8 @@ class _AdminPanelState extends State<AdminPanel> {
               child: _selectedTab == 0
                   ? _buildSystemLogs(theme)
                   : _selectedTab == 1
-                      ? _buildAppContent(theme)
-                      : _buildUserAccounts(theme),
+                  ? _buildAppContent(theme)
+                  : _buildUserAccounts(theme),
             ),
           ],
         ),
@@ -879,10 +975,14 @@ class _AdminPanelState extends State<AdminPanel> {
                     children: [
                       IconButton(
                         icon: Icon(
-                          alumni.isVisible ? Icons.visibility : Icons.visibility_off,
+                          alumni.isVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                           color: alumni.isVisible ? Colors.green : Colors.grey,
                         ),
-                        tooltip: alumni.isVisible ? 'Hide from public' : 'Show on public page',
+                        tooltip: alumni.isVisible
+                            ? 'Hide from public'
+                            : 'Show on public page',
                         onPressed: () async {
                           await DataService.saveAlumniProfile(
                             alumni.copyWith(
@@ -909,7 +1009,8 @@ class _AdminPanelState extends State<AdminPanel> {
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
@@ -944,9 +1045,7 @@ class _AdminPanelState extends State<AdminPanel> {
               ? Center(
                   child: Text(
                     'No modules uploaded yet.',
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 )
               : ListView.builder(
@@ -965,9 +1064,7 @@ class _AdminPanelState extends State<AdminPanel> {
                         ),
                         title: Text(
                           module.title,
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                          ),
+                          style: TextStyle(color: theme.colorScheme.onSurface),
                         ),
                         subtitle: Text(
                           module.content.length > 60
